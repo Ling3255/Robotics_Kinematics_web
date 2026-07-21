@@ -25,7 +25,7 @@ function createInitialProgress(): Record<number, MissionProgress> {
       chapterId: i,
       currentTask: 0,
       tasksCompleted: 0,
-      isUnlocked: i <= 2, // Chapter 1、2 初始解锁
+      isUnlocked: i <= 3, // Chapter 1、2 初始解锁
     };
   }
   return chapters;
@@ -49,7 +49,7 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
             chapterId,
             currentTask: 0,
             tasksCompleted: 0,
-            isUnlocked: chapterId <= 2,
+            isUnlocked: chapterId <= 3,
           },
         },
       });

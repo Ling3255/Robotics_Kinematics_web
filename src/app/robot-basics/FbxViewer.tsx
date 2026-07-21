@@ -595,7 +595,7 @@ export default function FbxViewer() {
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
 
   return (
-    <div className="relative h-screen w-full">
+    <div className="relative h-full w-full">
       <div className="flex h-full w-full">
         <div className="relative h-full w-1/2">
           <Canvas>

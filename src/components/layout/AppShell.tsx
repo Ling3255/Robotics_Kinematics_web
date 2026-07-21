@@ -19,7 +19,7 @@ interface AppShellProps {
 
 export default function AppShell({ children, bottomPanel }: AppShellProps) {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="h-screen overflow-hidden bg-slate-50">
       {/* Top navigation bar */}
       <TopBar />
 
@@ -27,7 +27,7 @@ export default function AppShell({ children, bottomPanel }: AppShellProps) {
       <ChapterSidebar />
 
       {/* Main content area */}
-      <main className="mt-14 mb-14 ml-[220px] min-h-[calc(100vh-112px)]">
+      <main className="ml-[220px] mt-14 h-[calc(100vh-112px)] overflow-hidden">
         {children}
       </main>
 

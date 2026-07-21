@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
-import { useProgress } from "@react-three/drei";
+import { GizmoHelper, GizmoViewport, useProgress } from "@react-three/drei";
 import Character3D, { type CharacterPos } from "@/components/Character3D";
 
 function LoadingOverlay() {
@@ -44,13 +44,22 @@ export default function PositionPage() {
   const posRef = useRef<CharacterPos>({ x: 0, y: 0, z: 0 });
 
   return (
-    <div className="relative h-[calc(100vh-112px)] w-full">
+    <div className="relative h-full w-full">
       <Canvas camera={{ position: [0, 5, 10], fov: 45 }} gl={{ antialias: true }}>
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 10, 5]} intensity={1} />
         <Suspense fallback={null}>
           <Character3D posRef={posRef} />
         </Suspense>
+        <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
+          <GizmoViewport
+            disabled
+            hideNegativeAxes
+            labels={["X", "Z", "Y"]}
+            axisColors={["#ef4444", "#22c55e", "#3b82f6"]}
+            labelColor="#111827"
+          />
+        </GizmoHelper>
       </Canvas>
 
       <LoadingOverlay />

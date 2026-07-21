@@ -1,3 +1,5 @@
+import BackflipViewer from "./BackflipViewer";
+
 export default function OrientationPage() {
-  return <div className="p-8" />;
+  return <BackflipViewer />;
 }
