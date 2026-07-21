@@ -2,15 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { CHAPTERS } from "@/content/chapters";
-import { useProgressStore } from "@/store/useProgressStore";
-import StepProgress from "./StepProgress";
 
 export default function TopBar() {
   const pathname = usePathname();
-  const { getChapterProgress } = useProgressStore();
 
   const currentChapter = CHAPTERS.find((ch) => ch.path === pathname);
-  const progress = currentChapter ? getChapterProgress(currentChapter.id) : null;
 
   return (
     <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 gap-4 fixed top-0 left-0 right-0 z-50">
@@ -37,9 +33,6 @@ export default function TopBar() {
             <span className="mx-2 text-slate-300">/</span>
             {currentChapter.title}
           </span>
-          {progress && progress.isUnlocked && (
-            <StepProgress current={progress.tasksCompleted} total={3} />
-          )}
         </div>
       )}
 

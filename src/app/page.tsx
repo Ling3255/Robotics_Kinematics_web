@@ -1,3 +1,5 @@
+import FbxViewer from './robot-basics/FbxViewer';
+
 export default function HomePage() {
-  return <div className="p-8" />;
+  return <FbxViewer />;
 }
