@@ -5,18 +5,16 @@ import { Canvas } from "@react-three/fiber";
 import { useProgress } from "@react-three/drei";
 import Character3D, { type CharacterPos } from "@/components/Character3D";
 
-/** 28MB 模型的加载提示（useProgress 为全局 store，可在 Canvas 外使用） */
 function LoadingOverlay() {
   const { active, progress } = useProgress();
   if (!active) return null;
   return (
     <div className="absolute inset-0 z-[6] flex items-center justify-center bg-gray-50/60 text-sm text-gray-400">
-      模型加载中… {progress.toFixed(0)}%
+      模型加载中... {progress.toFixed(0)}%
     </div>
   );
 }
 
-/** 实时坐标显示（rAF 直写 DOM，避免每帧触发 React 重渲染） */
 function CoordinateOverlay({ posRef }: { posRef: { current: CharacterPos } }) {
   const textRef = useRef<HTMLSpanElement>(null);
 
@@ -59,8 +57,9 @@ export default function PositionPage() {
       <CoordinateOverlay posRef={posRef} />
 
       <div className="absolute left-4 top-4 z-10 rounded-lg bg-white/90 px-3 py-2 text-xs leading-5 text-gray-600 shadow-lg backdrop-blur">
-        <p>WASD / 方向键：控制小人移动</p>
-        <p>空格：跳跃腾空</p>
+        <p>WASD / 方向键：控制 X-Y 平面移动</p>
+        <p>按住空格：沿 Z 轴正方向上升</p>
+        <p>按住 Shift：沿 Z 轴负方向下降</p>
       </div>
     </div>
   );

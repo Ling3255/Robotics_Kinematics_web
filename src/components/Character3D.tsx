@@ -5,17 +5,10 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import type { Group } from "three";
 
-/** Movement speed per frame */
 const SPEED = 0.08;
 
-/** Jump vertical speed per frame & gravity per frame */
-const JUMP_SPEED = 0.25;
-const GRAVITY = 0.012;
-
-/** Keyboard key set */
 type KeyMap = Record<string, boolean>;
 
-/** Live position reported to the page overlay */
 export interface CharacterPos {
   x: number;
   y: number;
@@ -28,21 +21,15 @@ export default function Character3D({
   posRef?: { current: CharacterPos };
 }) {
   const groupRef = useRef<Group>(null!);
+  const logicalPosRef = useRef<CharacterPos>({ x: 0, y: 0, z: 0 });
 
-  // Vertical velocity for the jump
-  const velYRef = useRef(0);
-
-  // Load the GLTF model
   const { scene, animations } = useGLTF("/models/run2.glb");
   const { actions } = useAnimations(animations, groupRef);
 
-  // Track pressed keys
   const [keys, setKeys] = useState<KeyMap>({});
 
-  // --- Keyboard event listeners ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Keep Space from scrolling the page
       if (e.code === "Space") e.preventDefault();
       setKeys((prev) => ({ ...prev, [e.code]: true }));
     };
@@ -58,7 +45,6 @@ export default function Character3D({
     };
   }, []);
 
-  // --- Auto-play the "run" animation ---
   useEffect(() => {
     const action = actions?.[Object.keys(actions ?? {})[0]];
     if (action) {
@@ -66,47 +52,40 @@ export default function Character3D({
     }
   }, [actions]);
 
-  // --- Per-frame movement logic ---
   useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
 
     let dx = 0;
+    let dy = 0;
     let dz = 0;
 
-    // WASD
-    if (keys["KeyW"] || keys["ArrowUp"]) dz -= SPEED;
-    if (keys["KeyS"] || keys["ArrowDown"]) dz += SPEED;
+    if (keys["KeyW"] || keys["ArrowUp"]) dy -= SPEED;
+    if (keys["KeyS"] || keys["ArrowDown"]) dy += SPEED;
     if (keys["KeyA"] || keys["ArrowLeft"]) dx -= SPEED;
     if (keys["KeyD"] || keys["ArrowRight"]) dx += SPEED;
 
-    // Only move & rotate when there is actual input
-    if (dx !== 0 || dz !== 0) {
-      group.position.x += dx;
-      group.position.z += dz;
+    if (keys["Space"]) dz += SPEED;
+    if (keys["ShiftLeft"] || keys["ShiftRight"]) dz -= SPEED;
 
-      // Face the movement direction (radians)
-      group.rotation.y = Math.atan2(dx, dz);
+    logicalPosRef.current.x += dx;
+    logicalPosRef.current.y += dy;
+    logicalPosRef.current.z += dz;
+
+    group.position.set(
+      logicalPosRef.current.x,
+      logicalPosRef.current.z,
+      logicalPosRef.current.y,
+    );
+
+    if (dx !== 0 || dy !== 0) {
+      group.rotation.y = Math.atan2(dx, dy);
     }
 
-    // --- Jump (Space): launch when on the ground, then apply gravity ---
-    if (keys["Space"] && group.position.y <= 0) {
-      velYRef.current = JUMP_SPEED;
-    }
-    if (group.position.y > 0 || velYRef.current !== 0) {
-      group.position.y += velYRef.current;
-      velYRef.current -= GRAVITY;
-      if (group.position.y <= 0) {
-        group.position.y = 0;
-        velYRef.current = 0;
-      }
-    }
-
-    // Report live position to the overlay
     if (posRef) {
-      posRef.current.x = group.position.x;
-      posRef.current.y = group.position.y;
-      posRef.current.z = group.position.z;
+      posRef.current.x = logicalPosRef.current.x;
+      posRef.current.y = logicalPosRef.current.y;
+      posRef.current.z = logicalPosRef.current.z;
     }
   });
 
