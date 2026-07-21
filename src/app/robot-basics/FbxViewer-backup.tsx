@@ -6,7 +6,7 @@ import { OrbitControls } from '@react-three/drei';
 import { FBXLoader, SkeletonUtils } from 'three-stdlib';
 import * as THREE from 'three';
 
-// 简化版测试 - 只显示基本的分屏布局和模型
+// Simple test view: split layout with the model only
 function TestModel() {
   const fbx = useLoader(FBXLoader, '/Silly Dancing.fbx');
   const clonedFbx = useMemo(() => SkeletonUtils.clone(fbx), [fbx]);
@@ -52,7 +52,7 @@ export default function FbxViewer() {
   return (
     <div className="relative h-screen w-full">
       <div className="flex h-full w-full">
-        {/* 左侧：3D模型 */}
+        {/* Left: 3D model */}
         <div className="relative h-full w-1/2 bg-gray-900">
           <Canvas>
             <CameraSetup />
@@ -63,23 +63,23 @@ export default function FbxViewer() {
           </Canvas>
         </div>
 
-        {/* 右侧：预留区域 */}
+        {/* Right: reserved area */}
         <div className="flex h-full w-1/2 items-center justify-center border-l-2 border-gray-300 bg-gradient-to-br from-gray-50 to-gray-100">
           <div className="text-center text-gray-400">
             <div className="mb-4 text-6xl">📐</div>
-            <p className="text-lg font-medium">预留区域</p>
-            <p className="mt-2 text-sm">用于放置其他模型</p>
+            <p className="text-lg font-medium">Reserved Area</p>
+            <p className="mt-2 text-sm">For placing another model</p>
           </div>
         </div>
       </div>
 
-      {/* 控制按钮 */}
+      {/* Controls */}
       <div className="absolute right-4 top-4 z-10 w-40 rounded-lg bg-white/90 p-4 text-sm shadow-lg backdrop-blur">
         <button
           onClick={() => window.location.reload()}
           className="w-full rounded bg-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-300"
         >
-          重新播放
+          Replay
         </button>
       </div>
     </div>

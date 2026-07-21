@@ -5,7 +5,7 @@ import AppShell from "@/components/layout/AppShell";
 export const metadata: Metadata = {
   title: "Robotics Kinematics | EBL Learning Platform",
   description:
-    "An interactive EBL-based learning platform for robotics kinematics — from robot basics to advanced inverse kinematics.",
+    "An interactive EBL-based learning platform for robotics kinematics, from robot basics to advanced inverse kinematics.",
 };
 
 export default function RootLayout({

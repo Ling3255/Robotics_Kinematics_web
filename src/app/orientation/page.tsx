@@ -1,5 +1,5 @@
-import BackflipViewer from "./BackflipViewer";
+import OrientationLesson from "./OrientationLesson";
 
 export default function OrientationPage() {
-  return <BackflipViewer />;
+  return <OrientationLesson />;
 }

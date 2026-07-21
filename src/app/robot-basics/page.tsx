@@ -1,5 +1,5 @@
-import FbxViewer from './FbxViewer';
+import RobotBasicsLesson from "./RobotBasicsLesson";
 
 export default function RobotBasicsPage() {
-  return <FbxViewer />;
+  return <RobotBasicsLesson />;
 }

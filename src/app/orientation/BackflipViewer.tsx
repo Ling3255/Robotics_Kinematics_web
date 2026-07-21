@@ -145,8 +145,8 @@ function RotationMatrixPanel({ matrixRef }: { matrixRef: MatrixRef }) {
   return (
     <div className="absolute bottom-4 left-4 right-4 z-10 rounded-lg bg-white/92 p-4 shadow-lg backdrop-blur">
       <div className="mb-3 flex items-baseline justify-between gap-4">
-        <h2 className="text-sm font-semibold text-gray-900">旋转矩阵 R</h2>
-        <span className="text-xs text-gray-500">人物姿态 = 方块姿态</span>
+        <h2 className="text-sm font-semibold text-gray-900">Rotation Matrix R</h2>
+        <span className="text-xs text-gray-500">Character pose = cube pose</span>
       </div>
       <div className="grid grid-cols-3 gap-2 font-mono text-sm tabular-nums text-gray-800">
         {INITIAL_ROTATION_MATRIX.map((value, index) => (
@@ -186,7 +186,7 @@ export default function BackflipViewer() {
           <CubeScene orientationRef={orientationRef} />
           <div className="absolute left-4 top-4 z-10 rounded-lg bg-white/90 px-3 py-2 shadow-lg backdrop-blur">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Orientation</p>
-            <p className="mt-1 text-sm text-gray-700">同步观察人物翻转、方块旋转和矩阵数值变化</p>
+            <p className="mt-1 text-sm text-gray-700">Watch the character flip, cube rotation, and matrix values change together.</p>
           </div>
           <RotationMatrixPanel matrixRef={matrixRef} />
         </div>

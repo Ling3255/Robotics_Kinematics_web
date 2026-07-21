@@ -24,11 +24,9 @@ const CUSTOM_ACTION_END: Record<string, { x: number; y: number; z: number }> = {
   mixamorigLeftForeArm: { x: 0, y: 0, z: 90 },
 };
 
-const DANCE_SECONDS = 5;
-const BLEND_SECONDS = 2;
 const LABEL_FADE_SECONDS = 1;
 
-type TimelinePhase = 'dancing' | 'blending' | 'holding';
+type TimelinePhase = 'raising' | 'holding';
 interface TimelineState {
   phase: TimelinePhase;
   elapsed: number;
@@ -95,32 +93,32 @@ const ANNOTATION_ROW_GAP = 48;
 const ANNOTATION_COL_OFFSET = 120;
 const ANNOTATION_LEADER_MAX = 80;
 const ANNOTATION_ITEMS: AnnotationItem[] = [
-  { key: 'wrist', title: 'Joint', sub: '腕关节 Wrist', bone: 'mixamorigLeftHand', rank: 4 },
+  { key: 'wrist', title: 'Joint', sub: 'Wrist joint', bone: 'mixamorigLeftHand', rank: 4 },
   {
     key: 'forearm',
     title: 'Link',
-    sub: '小臂 Radius/Ulna',
+    sub: 'Forearm Radius/Ulna',
     from: 'mixamorigLeftForeArm',
     to: 'mixamorigLeftHand',
     rank: 3,
   },
-  { key: 'elbow', title: 'Joint', sub: '肘关节 Elbow', bone: 'mixamorigLeftForeArm', rank: 2 },
+  { key: 'elbow', title: 'Joint', sub: 'Elbow joint', bone: 'mixamorigLeftForeArm', rank: 2 },
   {
     key: 'upperarm',
     title: 'Link',
-    sub: '大臂 Humerus',
+    sub: 'Upper arm Humerus',
     from: 'mixamorigLeftArm',
     to: 'mixamorigLeftForeArm',
     rank: 1,
   },
-  { key: 'shoulder', title: 'Joint', sub: '肩关节 Shoulder', bone: 'mixamorigLeftArm', rank: 0 },
+  { key: 'shoulder', title: 'Joint', sub: 'Shoulder joint', bone: 'mixamorigLeftArm', rank: 0 },
 ];
 const TMP_A = new THREE.Vector3();
 const TMP_B = new THREE.Vector3();
 
 interface IkState {
   hasDragged: boolean;
-  target: THREE.Vector3; // 世界坐标
+  target: THREE.Vector3;
 }
 
 const IK_BONES = {
@@ -140,7 +138,7 @@ const IK_Q1 = new THREE.Quaternion();
 const IK_Q2 = new THREE.Quaternion();
 const IK_Q3 = new THREE.Quaternion();
 
-/** 迷你 CCD IK：把腕部（hand）迭代拉向 targetWorld，只旋转肘、肩两根骨骼 */
+/** Mini CCD IK: iteratively pulls the wrist toward targetWorld by rotating the elbow and shoulder bones. */
 function solveArmIk(
   upperArm: THREE.Bone,
   foreArm: THREE.Bone,
@@ -152,17 +150,17 @@ function solveArmIk(
       if (!bone.parent) continue;
 
       bone.getWorldPosition(IK_V1);
-      hand.getWorldPosition(IK_V2).sub(IK_V1); // 骨骼 → 腕当前位置
-      IK_V3.copy(targetWorld).sub(IK_V1); // 骨骼 → 目标位置
+      hand.getWorldPosition(IK_V2).sub(IK_V1);
+      IK_V3.copy(targetWorld).sub(IK_V1);
       if (IK_V2.lengthSq() < 1e-10 || IK_V3.lengthSq() < 1e-10) continue;
       IK_V2.normalize();
       IK_V3.normalize();
 
-      IK_Q1.setFromUnitVectors(IK_V2, IK_V3); // 世界空间修正旋转
+      IK_Q1.setFromUnitVectors(IK_V2, IK_V3);
       bone.getWorldQuaternion(IK_Q2);
-      IK_Q3.copy(IK_Q1).multiply(IK_Q2); // 骨骼新的世界四元数
+      IK_Q3.copy(IK_Q1).multiply(IK_Q2);
       bone.parent.getWorldQuaternion(IK_Q2);
-      bone.quaternion.copy(IK_Q2.invert().multiply(IK_Q3)); // 转回局部空间
+      bone.quaternion.copy(IK_Q2.invert().multiply(IK_Q3));
     }
   }
 }
@@ -183,9 +181,7 @@ function Model({
   const fbx = useLoader(FBXLoader, '/Silly Dancing.fbx');
   const clonedFbx = useMemo(() => SkeletonUtils.clone(fbx), [fbx]);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const clipRef = useRef<THREE.AnimationClip | null>(null);
   const customClipRef = useRef<THREE.AnimationClip | null>(null);
-  const customActionRef = useRef<THREE.AnimationAction | null>(null);
   const solveIKRef = useRef<(() => void) | null>(null);
 
   const scale = useMemo(() => {
@@ -206,83 +202,52 @@ function Model({
   }, [clonedFbx]);
 
   useEffect(() => {
-    const clip = clonedFbx.animations.reduce<THREE.AnimationClip | null>(
-      (best, current) => (current.tracks.length > (best?.tracks.length ?? -1) ? current : best),
-      null,
-    );
-    clipRef.current = clip;
-    if (clip) {
-      mixerRef.current = new THREE.AnimationMixer(clonedFbx);
-      customClipRef.current = buildCustomClip(jointMap);
-    }
+    mixerRef.current = new THREE.AnimationMixer(clonedFbx);
+    customClipRef.current = buildCustomClip(jointMap);
 
     return () => {
       mixerRef.current?.stopAllAction();
       mixerRef.current = null;
-      clipRef.current = null;
       customClipRef.current = null;
-      customActionRef.current = null;
     };
   }, [clonedFbx, jointMap]);
 
   useEffect(() => {
     const mixer = mixerRef.current;
-    const clip = clipRef.current;
     const customClip = customClipRef.current;
 
-    if (!mixer || !clip || !customClip) return;
+    if (!mixer || !customClip) return;
 
     mixer.stopAllAction();
     jointMap.forEach(({ bone, initRotation }) => {
       bone.rotation.copy(initRotation);
     });
 
-    timelineStateRef.current = { phase: 'dancing', elapsed: 0, labelOpacity: 0 };
+    timelineStateRef.current = { phase: 'raising', elapsed: 0, labelOpacity: 0 };
     ikStateRef.current.hasDragged = false;
 
-    const danceAction = mixer.clipAction(clip);
     const customAction = mixer.clipAction(customClip);
-    customActionRef.current = customAction;
-
-    danceAction.reset().setLoop(THREE.LoopRepeat, Infinity).play();
-    customAction.reset().setLoop(THREE.LoopOnce, 1).stop();
+    customAction.reset().setLoop(THREE.LoopOnce, 1).play();
     customAction.clampWhenFinished = true;
   }, [replayTick, jointMap, timelineStateRef, ikStateRef]);
 
   useFrame((_, delta) => {
     const mixer = mixerRef.current;
-    const clip = clipRef.current;
-    const customAction = customActionRef.current;
     const state = timelineStateRef.current;
 
     if (!mixer) return;
 
     state.elapsed += delta;
+    mixer.update(delta);
 
-    if (state.phase === 'dancing') {
-      mixer.update(delta);
-      if (state.elapsed >= DANCE_SECONDS) {
-        state.phase = 'blending';
-        state.elapsed = 0;
-        if (clip && customAction) {
-          const danceAction = mixer.clipAction(clip);
-          customAction.reset().play();
-          danceAction.crossFadeTo(customAction, BLEND_SECONDS, false);
-        }
-      }
-      return;
-    }
-
-    if (state.phase === 'blending') {
-      mixer.update(delta);
-      if (state.elapsed >= BLEND_SECONDS) {
+    if (state.phase === 'raising') {
+      if (state.elapsed >= CUSTOM_ACTION_DURATION) {
         state.phase = 'holding';
         state.elapsed = 0;
       }
       return;
     }
 
-    mixer.update(delta);
     solveIKRef.current?.();
     state.labelOpacity =
       state.elapsed <= LABEL_FADE_SECONDS ? Math.min(state.elapsed / LABEL_FADE_SECONDS, 1) : 1;
@@ -290,7 +255,7 @@ function Model({
 
   return (
     <>
-      <primitive object={clonedFbx} scale={scale} />
+      <primitive object={clonedFbx} scale={scale} position={[-1.25, -0.55, 0]} />
       <LabelProjector jointMap={jointMap} refsMapRef={overlayRefsRef} items={ANNOTATION_ITEMS} />
       <HandDragIK
         jointMap={jointMap}
@@ -323,8 +288,6 @@ function HandDragIK({
   const upperArm = jointMap.get(IK_BONES.upperArm)?.bone ?? null;
   const foreArm = jointMap.get(IK_BONES.foreArm)?.bone ?? null;
   const hand = jointMap.get(IK_BONES.hand)?.bone ?? null;
-
-  // 向 Model 注册求解器：holding 阶段且拖拽过后，每帧在 mixer.update 之后求解
   useEffect(() => {
     if (!upperArm || !foreArm || !hand) return;
     solveIKRef.current = () => {
@@ -337,16 +300,12 @@ function HandDragIK({
       solveIKRef.current = null;
     };
   }, [solveIKRef, timelineStateRef, ikStateRef, upperArm, foreArm, hand]);
-
-  // 手柄小球同步到腕骨，仅 holding 阶段可见
   useFrame(() => {
     const handle = handleRef.current;
     if (!handle || !hand) return;
     hand.getWorldPosition(handle.position);
     handle.visible = timelineStateRef.current.phase === 'holding';
   });
-
-  // 指针拖拽交互
   useEffect(() => {
     const dom = gl.domElement;
     if (!upperArm || !foreArm || !hand) return;
@@ -371,14 +330,10 @@ function HandDragIK({
       if (e.button !== 0) return;
       if (timelineStateRef.current.phase !== 'holding') return;
       if (wristScreenDistance(e) > GRAB_THRESHOLD_PX) return;
-
-      // 拖拽平面：过腕点、法线为相机视线方向
       hand.getWorldPosition(wristWorld);
       camera.getWorldDirection(camDir);
       dragRef.current.plane.setFromNormalAndCoplanarPoint(camDir, wristWorld);
       dragRef.current.active = true;
-
-      // 臂展上限 =（肩→肘 + 肘→腕）× 余量系数
       upperArm.getWorldPosition(shoulderPos);
       foreArm.getWorldPosition(hit);
       const upperLen = shoulderPos.distanceTo(hit);
@@ -409,8 +364,6 @@ function HandDragIK({
       );
       raycaster.setFromCamera(ndc, camera);
       if (!raycaster.ray.intersectPlane(dragRef.current.plane, hit)) return;
-
-      // 以肩为圆心钳制目标距离
       upperArm.getWorldPosition(shoulderPos);
       reachDir.copy(hit).sub(shoulderPos);
       const len = reachDir.length();
@@ -425,8 +378,6 @@ function HandDragIK({
       if (dom.hasPointerCapture(e.pointerId)) dom.releasePointerCapture(e.pointerId);
       dom.style.cursor = '';
     };
-
-    // capture 阶段注册，保证先于 OrbitControls 处理 pointerdown
     dom.addEventListener('pointerdown', onPointerDown, true);
     dom.addEventListener('pointermove', onPointerMove);
     dom.addEventListener('pointerup', endDrag);
@@ -587,7 +538,7 @@ export default function FbxViewer() {
   const [hintsCollapsed, setHintsCollapsed] = useState(false);
   const overlayRefsRef = useRef<OverlayRefsMap>(new Map());
   const timelineStateRef = useRef<TimelineState>({
-    phase: 'dancing',
+    phase: 'raising',
     elapsed: 0,
     labelOpacity: 0,
   });
@@ -622,15 +573,13 @@ export default function FbxViewer() {
             <button
               onClick={() => setReplayTick((n) => n + 1)}
               className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-gray-700 shadow-lg backdrop-blur hover:bg-white"
-            >
-              重新播放
-            </button>
+            >Replay</button>
             {hintsCollapsed ? (
               <button
                 onClick={() => setHintsCollapsed(false)}
                 className="rounded-lg bg-white/90 p-2 text-gray-500 shadow-lg backdrop-blur hover:bg-white hover:text-gray-700"
-                aria-label="展开提示"
-                title="操作提示"
+                aria-label="Show hints"
+                title="Controls"
               >
                 <svg
                   width="14"
@@ -649,15 +598,15 @@ export default function FbxViewer() {
               </button>
             ) : (
               <div className="rounded-lg bg-white/90 px-3 py-2 text-xs leading-5 text-gray-600 shadow-lg backdrop-blur">
-                <p>按住鼠标左键拖动：旋转视角</p>
-                <p>Shift + 左键拖动：平移视角</p>
-                <p>滚轮：缩放视角</p>
-                <p>动画定格后，按住人物左手拖动：改变手臂姿势</p>
+                <p>Drag with the left mouse button: rotate view</p>
+                <p>Shift + left drag: pan view</p>
+                <p>Mouse wheel: zoom view</p>
+                <p>After the pose holds, drag the character&apos;s left hand to adjust the arm pose</p>
                 <div className="mt-1 flex justify-end">
                   <button
                     onClick={() => setHintsCollapsed(true)}
                     className="text-gray-400 hover:text-gray-600"
-                    aria-label="收起提示"
+                    aria-label="Hide hints"
                   >
                     <svg
                       width="14"

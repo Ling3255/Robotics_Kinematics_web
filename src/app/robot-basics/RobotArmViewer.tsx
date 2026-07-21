@@ -1,11 +1,5 @@
 'use client';
 
-// 机械臂 GLB 模型与 DH 装配参数来源：https://github.com/ual-arm/robodimm （MIT License）
-// 网格按其“驱动关节支点框架”建模（home 姿态方向、原点为关节支点），与 robodimm 的
-// joint_body_transforms[i] = T_{i-1}·RotZ(θ_i) 对应；运行时世界旋转 = R_i(q)·R_home_i^T。
-// 实现方式：每个关节拆成嵌套两组 rotG(变位 RotZ) → offG(常量 d/a/alpha)，
-// 连杆 i 以常量局部旋转 R_home_i^T 挂到 rotG[i] 下。
-
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -22,7 +16,7 @@ const MESH_URLS = [
   '/meshes/irb4600/IRB4600_20kg-250_LINK6.glb',
 ];
 
-/** 标准 DH 关节参数（取自 robodimm irb4600Serial6Spec），A = RotZ(θ+offset)·TransZ(d)·TransX(a)·RotX(alpha) */
+/** Standard DH joint parameters from robodimm irb4600Serial6Spec. A = RotZ(theta+offset) * TransZ(d) * TransX(a) * RotX(alpha). */
 interface JointSpec {
   a: number;
   alpha: number;
@@ -44,7 +38,7 @@ const JOINTS: JointSpec[] = [
 const INITIAL_THETAS = [-0.4, 0.3, 0.6, 0, 0.5, 0];
 const ROBOT_SCALE = 2;
 
-/** 世界坐标系（缩放后）下的可达范围钳制 */
+/** Reach clamp in scaled world coordinates. */
 const ARM_MAX_REACH = (1.095 + 0.175 + 1.2305 + 0.085) * ROBOT_SCALE * 0.98;
 const MIN_REACH = 1.0;
 const FLOOR_Y = 0.15;
@@ -54,14 +48,14 @@ const IK_TOLERANCE = 0.02;
 const IK_MAX_STEP = 0.3;
 const GRAB_THRESHOLD_PX = 48;
 
-/** 悬浮高亮的发光颜色（与标签红一致） */
+/** Emissive hover color, matched to the red label color. */
 const HIGHLIGHT_EMISSIVE = 0xdc2626;
 const HIGHLIGHT_INTENSITY = 0.5;
 
-/** 可悬浮的模型部件 */
+/** Hoverable model parts. */
 type PartKey = 'base' | 'link1' | 'link2' | 'link3' | 'link4' | 'link5' | 'link6';
 
-/** Joint/Link 教学标注：锚点取关节支点（或两支点中点），parts 为悬浮高亮关联的模型部件 */
+/** Joint/Link teaching annotations. Anchors use joint pivots or midpoints; parts drive hover highlights. */
 interface AnnotationItem {
   key: string;
   title: string;
@@ -72,12 +66,12 @@ interface AnnotationItem {
 }
 
 const ANNOTATION_ITEMS: AnnotationItem[] = [
-  { key: 'j1', title: 'Joint', sub: '基座回转 Base J1', rank: 4, anchor: { kind: 'mid', a: 0, b: 1 }, parts: ['base', 'link1'] },
-  { key: 'j2', title: 'Joint', sub: '肩关节 Shoulder J2', rank: 3, anchor: { kind: 'joint', index: 1 }, parts: ['link2'] },
-  { key: 'upperarm', title: 'Link', sub: '大臂 Upper arm', rank: 1, anchor: { kind: 'mid', a: 1, b: 2 }, parts: ['link2'] },
-  { key: 'j3', title: 'Joint', sub: '肘关节 Elbow J3', rank: 0, anchor: { kind: 'joint', index: 2 }, parts: ['link3'] },
-  { key: 'forearm', title: 'Link', sub: '小臂 Forearm', rank: 2, anchor: { kind: 'mid', a: 3, b: 4 }, parts: ['link4'] },
-  { key: 'wrist', title: 'Joint', sub: '腕关节 Wrist J4-J6', rank: 5, anchor: { kind: 'joint', index: 4 }, parts: ['link5', 'link6'] },
+  { key: 'j1', title: 'Joint', sub: 'Base rotation J1', rank: 4, anchor: { kind: 'mid', a: 0, b: 1 }, parts: ['base', 'link1'] },
+  { key: 'j2', title: 'Joint', sub: 'Shoulder joint J2', rank: 3, anchor: { kind: 'joint', index: 1 }, parts: ['link2'] },
+  { key: 'upperarm', title: 'Link', sub: 'Upper arm', rank: 1, anchor: { kind: 'mid', a: 1, b: 2 }, parts: ['link2'] },
+  { key: 'j3', title: 'Joint', sub: 'Elbow joint J3', rank: 0, anchor: { kind: 'joint', index: 2 }, parts: ['link3'] },
+  { key: 'forearm', title: 'Link', sub: 'Forearm', rank: 2, anchor: { kind: 'mid', a: 3, b: 4 }, parts: ['link4'] },
+  { key: 'wrist', title: 'Joint', sub: 'Wrist joint J4-J6', rank: 5, anchor: { kind: 'joint', index: 4 }, parts: ['link5', 'link6'] },
 ];
 
 interface OverlayEntry {
@@ -92,7 +86,7 @@ const ANNOTATION_ROW_GAP = 48;
 const ANNOTATION_COL_OFFSET = 120;
 const ANNOTATION_LEADER_MAX = 80;
 
-/** 标准 DH 齐次变换矩阵 */
+/** Standard DH homogeneous transform matrix. */
 function dhMatrix(theta: number, d: number, a: number, alpha: number): THREE.Matrix4 {
   const ct = Math.cos(theta);
   const st = Math.sin(theta);
@@ -115,7 +109,7 @@ const IK_W1 = new THREE.Vector3();
 const IK_W2 = new THREE.Vector3();
 const IK_CROSS = new THREE.Vector3();
 
-/** θ 空间 CCD：逐关节把 TCP 拉向 targetWorld（joints[i] 即关节 i 的支点：原点与 z 轴均正确） */
+/** CCD in joint-angle space: pull TCP toward targetWorld one joint at a time. */
 function solveCcd(
   joints: THREE.Group[],
   tcpObj: THREE.Object3D,
@@ -130,8 +124,6 @@ function solveCcd(
       const pivotObj = joints[i];
       pivotObj.getWorldPosition(IK_P);
       IK_AXIS.setFromMatrixColumn(pivotObj.matrixWorld, 2).normalize();
-
-      // 把 支点→TCP 与 支点→目标 投影到垂直关节轴的平面
       IK_V1.copy(IK_TCP).sub(IK_P);
       IK_V2.copy(targetWorld).sub(IK_P);
       IK_W1.copy(IK_V1).addScaledVector(IK_AXIS, -IK_V1.dot(IK_AXIS));
@@ -156,7 +148,7 @@ function solveCcd(
 const TMP_A = new THREE.Vector3();
 const TMP_B = new THREE.Vector3();
 
-/** 每帧把标注锚点投影到屏幕，并直接写入 SVG 元素属性（不经 React state） */
+/** Project annotation anchors to screen space each frame and write SVG attributes directly. */
 function ArmLabelProjector({
   rig,
   refsMapRef,
@@ -225,7 +217,7 @@ function ArmLabelProjector({
   return null;
 }
 
-/** 标注覆盖层：版式与左侧人物一致；标签可悬浮（pointerEvents auto）反向高亮模型部件 */
+/** Annotation overlay matching the character side; labels can hover-highlight model parts. */
 function LabelsOverlay({
   items,
   refsMapRef,
@@ -279,13 +271,13 @@ function LabelsOverlay({
 
 interface ArmRig {
   root: THREE.Group;
-  /** 每关节的旋转组（支点=其原点，轴=其 z 轴） */
+  /** Rotation groups for each joint; each origin is the joint pivot and each axis is local z. */
   joints: THREE.Group[];
-  /** 末端（法兰）对象 */
+  /** End-effector flange object. */
   tcp: THREE.Object3D;
-  /** 肩关节（J2 支点），用于可达范围钳制 */
+  /** Shoulder joint pivot used for reach clamping. */
   shoulder: THREE.Object3D;
-  /** 可悬浮的部件根（基座 + 6 根连杆的克隆体） */
+  /** Hoverable part roots: base plus the six cloned links. */
   parts: Record<PartKey, THREE.Object3D>;
   applyThetas: (thetas: number[]) => void;
 }
@@ -314,8 +306,6 @@ function RobotArm({
 
   const rig = useMemo<ArmRig>(() => {
     const root = new THREE.Group();
-
-    // 每个关节拆成两个嵌套组：rotG(变位 RotZ，原点与 z 轴即关节支点) → offG(常量 d/a/alpha 偏移)
     const joints: THREE.Group[] = [];
     const offsets: THREE.Group[] = [];
     let parent: THREE.Object3D = root;
@@ -331,8 +321,6 @@ function RobotArm({
       offsets.push(offG);
       parent = offG;
     }
-
-    // home(q=0) 时 rotG 的世界旋转 R_home_i → 连杆网格的常量补偿旋转 R_home_i^T
     const rotZ = new THREE.Matrix4();
     const rot = new THREE.Matrix4();
     const homePrev = new THREE.Matrix4();
@@ -349,10 +337,6 @@ function RobotArm({
       }
       root.updateMatrixWorld(true);
     };
-
-    // BASE 挂根；LINK i 以常量旋转 R_home_i^T 挂到关节旋转组 i
-    // 注意必须 clone(true)：StrictMode 下 useMemo 会执行两次，直接 add 同一个
-    // gltf.scene 会被后一个 rig 抢走（Object3D.add 自动从旧父级移除），导致渲染的是空壳
     const parts = {} as Record<PartKey, THREE.Object3D>;
     const baseMesh = gltfs[0].scene.clone(true);
     root.add(baseMesh);
@@ -380,8 +364,6 @@ function RobotArm({
   useEffect(() => {
     onReady();
   }, [onReady]);
-
-  // 悬浮高亮：hoverItems 并集对应的部件自发光，清空时恢复原材质
   useEffect(() => {
     if (hoverItems.length === 0) return;
 
@@ -415,16 +397,12 @@ function RobotArm({
       }
     };
   }, [hoverItems, rig]);
-
-  // 每帧：跟踪 IK 目标点；手柄小球同步到 TCP
   useFrame(() => {
     const target = ikTargetRef.current;
     if (target) solveCcd(rig.joints, rig.tcp, rig.applyThetas, thetasRef.current, target);
     const handle = handleRef.current;
     if (handle) rig.tcp.getWorldPosition(handle.position);
   });
-
-  // 指针交互（capture 阶段注册，保证先于 OrbitControls 处理 pointerdown）
   useEffect(() => {
     const dom = gl.domElement;
     const tcpObj = rig.tcp;
@@ -456,8 +434,6 @@ function RobotArm({
       const sy = (-tcpWorld.y * 0.5 + 0.5) * rect.height;
       return Math.hypot(e.clientX - rect.left - sx, e.clientY - rect.top - sy);
     };
-
-    // 命中对象向上找所属部件根
     const findPartKey = (obj: THREE.Object3D): PartKey | null => {
       let cur: THREE.Object3D | null = obj;
       while (cur) {
@@ -471,8 +447,6 @@ function RobotArm({
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       if (tcpScreenDistance(e) > GRAB_THRESHOLD_PX) return;
-
-      // 拖拽平面：过 TCP、法线为相机视线方向
       tcpObj.getWorldPosition(tcpWorld);
       camera.getWorldDirection(camDir);
       dragRef.current.plane.setFromNormalAndCoplanarPoint(camDir, tcpWorld);
@@ -488,13 +462,11 @@ function RobotArm({
 
     const onPointerMove = (e: PointerEvent) => {
       if (!dragRef.current.active) {
-        // 靠近 TCP 手柄时优先抓取光标
         if (tcpScreenDistance(e) <= GRAB_THRESHOLD_PX) {
           dom.style.cursor = 'grab';
           onHoverItems([]);
           return;
         }
-        // 悬浮部件检测：高亮模型部件 + 强调关联标签
         pointerNdc(e);
         raycaster.setFromCamera(ndc, camera);
         const hits = raycaster.intersectObjects(partRootList, true);
@@ -513,8 +485,6 @@ function RobotArm({
       pointerNdc(e);
       raycaster.setFromCamera(ndc, camera);
       if (!raycaster.ray.intersectPlane(dragRef.current.plane, hit)) return;
-
-      // 以肩关节为球心钳制目标距离，并保持在地面以上
       shoulderObj.getWorldPosition(shoulderPos);
       reachDir.copy(hit).sub(shoulderPos);
       const len = reachDir.length();
@@ -553,7 +523,7 @@ function RobotArm({
 
   return (
     <>
-      {/* CAD 数据为 Z-up：整体绕 X 转 -90° 转为 Y-up，并放大到与左侧人物相衬的尺寸 */}
+      {}
       <group rotation={[-Math.PI / 2, 0, 0]} scale={ROBOT_SCALE}>
         <primitive object={rig.root} />
       </group>
@@ -574,8 +544,6 @@ export default function RobotArmViewer() {
   const ikTargetRef = useRef<THREE.Vector3 | null>(null);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const overlayRefsRef = useRef<OverlayRefsMap>(new Map());
-
-  // pointermove 每帧都会上报，内容相同则不触发重渲染
   const handleHoverItems = useCallback((keys: string[]) => {
     const k = keys.join('|');
     if (hoverKeyRef.current === k) return;
@@ -611,16 +579,14 @@ export default function RobotArmViewer() {
       />
 
       {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
-          机械臂模型加载中…
-        </div>
+        <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">Loading robot arm model...</div>
       )}
 
       <div className="absolute left-4 top-4 z-10 rounded-lg bg-white/90 px-3 py-2 text-xs leading-5 text-gray-600 shadow-lg backdrop-blur">
-        <p>按住鼠标左键拖动：旋转视角</p>
-        <p>滚轮：缩放视角</p>
-        <p>按住机械臂末端小球拖动：改变姿态</p>
-        <p>悬浮机械臂部件或标签：高亮对应部分</p>
+        <p>Drag with the left mouse button: rotate view</p>
+        <p>Mouse wheel: zoom view</p>
+        <p>Drag the end-effector sphere to adjust the pose</p>
+        <p>Hover robot parts or labels to highlight matching components</p>
       </div>
     </div>
   );
