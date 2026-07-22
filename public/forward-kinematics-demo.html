@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>正向运动学可视化 — Forward Kinematics Demo</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    background: #1a1a2e;
+    color: #e2e8f0;
+  }
+
+  /* ========== 顶部工具栏 ========== */
+  .toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: 48px; background: rgba(30, 30, 50, .92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    display: flex; align-items: center; padding: 0 16px; gap: 12px;
+  }
+  .toolbar .title {
+    font-size: 14px; font-weight: 700; letter-spacing: .5px;
+  }
+  .toolbar .spacer { flex: 1; }
+  .toolbar button {
+    padding: 6px 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.06); color: #cbd5e1; font-size: 12px;
+    cursor: pointer; transition: all .2s; font-weight: 500;
+  }
+  .toolbar button:hover { background: rgba(255,255,255,.12); color: #fff; }
+  .toolbar button.active {
+    background: #3b82f6; border-color: #3b82f6; color: #fff;
+  }
+
+  /* ========== 底部信息栏 ========== */
+  .info-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    height: 28px; background: rgba(30,30,50,.85);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(255,255,255,.06);
+    display: flex; align-items: center; padding: 0 16px;
+    font-size: 11px; color: #64748b; gap: 20px;
+  }
+  .info-bar span { color: #94a3b8; }
+
+  /* ========== 3D画布 ========== */
+  #three-canvas {
+    position: fixed; inset: 0; display: block;
+  }
+
+  /* ========== 加载提示 ========== */
+  .loading-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: #1a1a2e; transition: opacity .4s;
+  }
+  .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loading-text { font-size: 16px; color: #94a3b8; letter-spacing: 1px; }
+
+  /* ========== lil-gui 面板覆盖样式 ========== */
+  .lil-gui { --font-family: system-ui, sans-serif; }
+  .lil-gui .title { font-size: 13px; font-weight: 700; background: #3b82f6; color: #fff; }
+  .lil-gui .controller { padding: 4px 12px; }
+</style>
+</head>
+<body>
+
+<!-- 加载提示 -->
+<div class="loading-overlay" id="loading-overlay">
+  <span class="loading-text">Loading Forward.glb...</span>
+</div>
+
+<!-- 顶部工具栏 -->
+<div class="toolbar">
+  <span class="title">&#128736; Forward Kinematics Demo</span>
+  <span class="spacer"></span>
+  <button id="btn-3d" class="active" title="透视相机 — 自由旋转观察">3D View</button>
+  <button id="btn-top" title="正交顶视图 — XY平面投影">Top</button>
+  <button id="btn-side" title="正交侧视图 — XZ平面投影">Side</button>
+</div>
+
+<!-- 底部信息栏 -->
+<div class="info-bar">
+  <span>Joint Angles</span>
+  <span id="info-angles" style="color:#93c5fd;">θ₁=0° θ₂=0° θ₃=0°</span>
+  <span style="margin-left:auto;">Drag to rotate &middot; Scroll to zoom</span>
+</div>
+
+<!-- 3D画布 -->
+<canvas id="three-canvas"></canvas>
+
+<!-- ================================================================
+     importmap CDN — 零本地依赖
+     ================================================================ -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+    "lil-gui": "https://unpkg.com/lil-gui@0.19.2/dist/lil-gui.esm.min.js"
+  }
+}
+</script>
+
+<!-- ================================================================
+     主脚本 — 分四大模块
+     ================================================================ -->
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import GUI from "lil-gui";
+
+// ================================================================
+// [可修改配置区] — 快速调整骨骼参数
+// ================================================================
+const CONFIG = {
+  /** 模型文件路径 */
+  modelPath: "./models/Forward.glb",
+  /** 骨骼名称列表（GLB内bone名称必须完全匹配） */
+  boneNames: ["joint1", "joint2", "joint3"],
+  /** 每个关节的旋转轴： "X" | "Y" | "Z"   */
+  rotationAxes: ["Z", "Z", "Z"],
+  /** 每个关节的旋转方向系数： 1 正向 / -1 反向 */
+  rotationSigns: [1, 1, 1],
+  /** 滑块角度上下限（度） */
+  angleMin: [-90, -90, -90],
+  angleMax: [90, 90, 90],
+  /** 初始角度 */
+  angleDefault: [30, 45, 0],
+  /** 2D正交视图缩放大小 */
+  orthoZoom: 4,
+};
+
+// ================================================================
+// 模块1：场景初始化
+// ================================================================
+const canvas = document.getElementById("three-canvas");
+const loadingOverlay = document.getElementById("loading-overlay");
+const infoAngles = document.getElementById("info-angles");
+
+// --- 渲染器 ---
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+// --- 场景 ---
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#1a1a2e");
+scene.fog = new THREE.Fog("#1a1a2e", 8, 40);
+
+// --- 透视相机（3D模式默认） ---
+const perspCamera = new THREE.PerspectiveCamera(
+  45, window.innerWidth / window.innerHeight, 0.1, 100
+);
+perspCamera.position.set(5, 4, 7);
+perspCamera.lookAt(0, 0, 0);
+
+// --- 正交相机（2D模式） ---
+function makeOrthoCamera(aspect) {
+  const z = CONFIG.orthoZoom;
+  return new THREE.OrthographicCamera(
+    -z * aspect, z * aspect, z, -z, 0.1, 100
+  );
+}
+let orthoCamera = makeOrthoCamera(window.innerWidth / window.innerHeight);
+
+// --- 当前活跃相机 ---
+let activeCamera = perspCamera;
+let cameraMode = "3d"; // "3d" | "top" | "side"
+
+// --- OrbitControls — 绑定透视相机 ---
+const orbitControls = new OrbitControls(perspCamera, renderer.domElement);
+orbitControls.enableDamping = true;
+orbitControls.dampingFactor = 0.08;
+orbitControls.target.set(0, 1.5, 0);
+orbitControls.update();
+
+// --- 光照 ---
+// 环境光
+scene.add(new THREE.AmbientLight("#ffffff", 1.8));
+// 半球光（天空+地面）
+scene.add(new THREE.HemisphereLight("#b1e1ff", "#1a1a2e", 0.6));
+// 主方向光（带阴影）
+const keyLight = new THREE.DirectionalLight("#ffffff", 2.5);
+keyLight.position.set(8, 12, 5);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 0.5;
+keyLight.shadow.camera.far = 50;
+keyLight.shadow.camera.left = -10;
+keyLight.shadow.camera.right = 10;
+keyLight.shadow.camera.top = 10;
+keyLight.shadow.camera.bottom = -10;
+keyLight.shadow.bias = -0.0001;
+scene.add(keyLight);
+// 补光
+const fillLight = new THREE.DirectionalLight("#93c5fd", 0.8);
+fillLight.position.set(-3, 4, -5);
+scene.add(fillLight);
+
+// --- 地面网格 ---
+const gridHelper = new THREE.GridHelper(10, 20, "#334155", "#1e293b");
+scene.add(gridHelper);
+
+// 半透明地面（接收阴影）
+const groundGeo = new THREE.PlaneGeometry(14, 14);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: "#0f172a", roughness: 0.9, metalness: 0, transparent: true, opacity: 0.5,
+});
+const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+groundMesh.rotation.x = -Math.PI / 2;
+groundMesh.position.y = -0.01;
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
+
+// --- 坐标轴指示器 ---
+function createAxisIndicator(size = 3) {
+  const group = new THREE.Group();
+  const makeAxis = (dir, color) => {
+    const mat = new THREE.MeshBasicMaterial({ color });
+    // 圆柱杆
+    const cylGeo = new THREE.CylinderGeometry(0.03, 0.03, size, 6);
+    const cyl = new THREE.Mesh(cylGeo, mat);
+    cyl.position.y = size / 2;
+    // 锥形箭头
+    const coneGeo = new THREE.ConeGeometry(0.08, 0.25, 8);
+    const cone = new THREE.Mesh(coneGeo, mat);
+    cone.position.y = size;
+    const sub = new THREE.Group();
+    sub.add(cyl); sub.add(cone);
+    sub.lookAt(dir);
+    return sub;
+  };
+  group.add(makeAxis(new THREE.Vector3(1, 0, 0), "#ef4444"));  // X 红
+  group.add(makeAxis(new THREE.Vector3(0, 1, 0), "#22c55e"));  // Y 绿
+  group.add(makeAxis(new THREE.Vector3(0, 0, 1), "#3b82f6"));  // Z 蓝
+  return group;
+}
+scene.add(createAxisIndicator(2.5));
+
+// ================================================================
+// [核心换算函数] 连杆间夹角 → 骨骼局部旋转（rad）
+// ================================================================
+/**
+ * PPT正运动学标准定义：
+ *   θ1 = 基座（地面）与连杆1（大臂）之间的夹角
+ *   θ2 = 连杆1（大臂）与连杆2（小臂）之间的夹角
+ *   θ3 = 连杆2（小臂）与末端夹爪之间的夹角
+ *
+ * 骨骼层级中 jointN 的局部旋转 = 该关节驱动的连杆相对于父连杆的偏转。
+ * 在 Blender 导出 rest pose 为伸直状态时，局部旋转即为 θN。
+ *
+ * @param {number} thetaDeg  — 连杆间夹角（度）
+ * @param {number} jointIndex — 关节索引 0/1/2
+ * @returns {number} 骨骼局部旋转量（弧度）
+ */
+function linkAngleToBoneRotation(thetaDeg, jointIndex) {
+  const sign = CONFIG.rotationSigns[jointIndex];
+  // 角度 → 弧度
+  return sign * THREE.MathUtils.degToRad(thetaDeg);
+}
+
+/**
+ * 将滑块角度数组一次性转换为各骨骼的旋转弧度数组
+ */
+function computeAllBoneRotations(anglesDeg) {
+  return anglesDeg.map((deg, i) => linkAngleToBoneRotation(deg, i));
+}
+
+// ================================================================
+// 模块2：模型加载
+// ================================================================
+const GLTF_LOADER = new GLTFLoader();
+/** @type {THREE.Bone[]} 按 joint1/joint2/joint3 顺序的骨骼引用 */
+let joints = [];
+/** @type {THREE.SkinnedMesh[]} 模型中的蒙皮网格（用于更新bounding等） */
+let skinnedMeshes = [];
+
+GLTF_LOADER.load(
+  CONFIG.modelPath,
+  (gltf) => {
+    console.log("[模型加载] Forward.glb 加载成功", gltf);
+
+    // --- 查找骨骼 ---
+    joints = [];
+    for (const name of CONFIG.boneNames) {
+      const bone = gltf.scene.getObjectByName(name);
+      if (bone && bone.isBone) {
+        joints.push(bone);
+        console.log(`[骨骼识别] 找到: ${name}`, bone);
+      } else {
+        console.warn(`[骨骼识别] 未找到骨骼: "${name}"，请检查GLB内的骨骼名称`);
+        console.log("可用对象列表:", gltf.scene.children.map(c => c.name));
+        // 递归搜索
+        gltf.scene.traverse((obj) => {
+          if (obj.isBone) console.log(`  骨骼: "${obj.name}"`);
+        });
+      }
+    }
+
+    // --- 收集蒙皮网格 ---
+    skinnedMeshes = [];
+    gltf.scene.traverse((obj) => {
+      if (obj.isSkinnedMesh) skinnedMeshes.push(obj);
+    });
+
+    // --- 放入场景 ---
+    scene.add(gltf.scene);
+
+    // 自动缩放适配（如果模型太大或太小）
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    if (maxDim > 8 || maxDim < 0.5) {
+      const scale = 3 / maxDim;
+      gltf.scene.scale.setScalar(scale);
+      console.log(`[模型缩放] 原始尺寸=${maxDim.toFixed(2)}, 缩放系数=${scale.toFixed(3)}`);
+    }
+
+    // 居中模型
+    const center = box.getCenter(new THREE.Vector3());
+    gltf.scene.position.set(-center.x, -box.min.y, -center.z);
+
+    console.log(`[模型加载] 完成 | 骨骼数=${joints.length} | 蒙皮网格数=${skinnedMeshes.length}`);
+
+    // 隐藏加载提示
+    loadingOverlay.classList.add("hidden");
+  },
+  (progress) => {
+    if (progress.total > 0) {
+      const pct = Math.round((progress.loaded / progress.total) * 100);
+      document.querySelector(".loading-text").textContent = `Loading... ${pct}%`;
+    }
+  },
+  (error) => {
+    console.error("[模型加载] 失败:", error);
+    document.querySelector(".loading-text").textContent =
+      "Failed to load Forward.glb — check file path and browser console.";
+  }
+);
+
+// ================================================================
+// 模块3：GUI 控制面板
+// ================================================================
+const guiState = {
+  theta1: CONFIG.angleDefault[0],
+  theta2: CONFIG.angleDefault[1],
+  theta3: CONFIG.angleDefault[2],
+};
+
+const gui = new GUI({ title: "Joint Angles (连杆夹角)", width: 280 });
+gui.domElement.style.position = "fixed";
+gui.domElement.style.top = "60px";
+gui.domElement.style.right = "12px";
+
+// θ1 滑块
+gui.add(guiState, "theta1", CONFIG.angleMin[0], CONFIG.angleMax[0], 0.5)
+  .name("θ₁  Base→UpperArm")
+  .onChange(updateJoints);
+
+// θ2 滑块
+gui.add(guiState, "theta2", CONFIG.angleMin[1], CONFIG.angleMax[1], 0.5)
+  .name("θ₂  UpperArm→Forearm")
+  .onChange(updateJoints);
+
+// θ3 滑块
+gui.add(guiState, "theta3", CONFIG.angleMin[2], CONFIG.angleMax[2], 0.5)
+  .name("θ₃  Forearm→Gripper")
+  .onChange(updateJoints);
+
+// 重置按钮
+gui.add({
+  reset: () => {
+    guiState.theta1 = CONFIG.angleDefault[0];
+    guiState.theta2 = CONFIG.angleDefault[1];
+    guiState.theta3 = CONFIG.angleDefault[2];
+    gui.controllers.forEach(c => c.updateDisplay());
+    updateJoints();
+  }
+}, "reset").name("Reset Defaults");
+
+/**
+ * 更新所有关节骨骼旋转
+ */
+function updateJoints() {
+  if (joints.length < 3) return;
+
+  const anglesDeg = [guiState.theta1, guiState.theta2, guiState.theta3];
+  const rotations = computeAllBoneRotations(anglesDeg);
+
+  joints.forEach((bone, i) => {
+    const axis = CONFIG.rotationAxes[i];
+    // 将旋转量设置到指定轴
+    bone.rotation.set(
+      axis === "X" ? rotations[i] : 0,
+      axis === "Y" ? rotations[i] : 0,
+      axis === "Z" ? rotations[i] : 0
+    );
+  });
+
+  // 更新底部信息栏
+  infoAngles.textContent = anglesDeg
+    .map((d, i) => `θ${i + 1}=${d.toFixed(1)}°`)
+    .join("  ");
+}
+
+// ================================================================
+// 2D/3D 视图切换
+// ================================================================
+document.getElementById("btn-3d").addEventListener("click", () => {
+  switchCamera("3d");
+});
+document.getElementById("btn-top").addEventListener("click", () => {
+  switchCamera("top");
+});
+document.getElementById("btn-side").addEventListener("click", () => {
+  switchCamera("side");
+});
+
+function switchCamera(mode) {
+  cameraMode = mode;
+
+  // 更新按钮状态
+  document.querySelectorAll(".toolbar button").forEach(b => b.classList.remove("active"));
+  if (mode === "3d") {
+    document.getElementById("btn-3d").classList.add("active");
+    activeCamera = perspCamera;
+    orbitControls.enabled = true;
+  } else if (mode === "top") {
+    document.getElementById("btn-top").classList.add("active");
+    activeCamera = orthoCamera;
+    // 顶视图：从上往下看XY平面
+    orthoCamera.position.set(0, CONFIG.orthoZoom * 3, 0.01);
+    orthoCamera.lookAt(0, 1.5, 0);
+    orbitControls.enabled = false;
+  } else if (mode === "side") {
+    document.getElementById("btn-side").classList.add("active");
+    activeCamera = orthoCamera;
+    // 侧视图：从侧面看XZ平面
+    orthoCamera.position.set(0.01, 1.5, CONFIG.orthoZoom * 3);
+    orthoCamera.lookAt(0, 1.5, 0);
+    orbitControls.enabled = false;
+  }
+}
+
+// ================================================================
+// 模块4：渲染循环
+// ================================================================
+function animate() {
+  requestAnimationFrame(animate);
+
+  // 3D模式下更新轨道控制器
+  if (cameraMode === "3d") {
+    orbitControls.update();
+  }
+
+  // 使用活跃相机渲染
+  renderer.render(scene, activeCamera);
+}
+animate();
+
+// ================================================================
+// 窗口自适应
+// ================================================================
+window.addEventListener("resize", () => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const aspect = w / Math.max(h, 1);
+
+  // 更新透视相机
+  perspCamera.aspect = aspect;
+  perspCamera.updateProjectionMatrix();
+
+  // 更新正交相机
+  const z = CONFIG.orthoZoom;
+  orthoCamera.left = -z * aspect;
+  orthoCamera.right = z * aspect;
+  orthoCamera.top = z;
+  orthoCamera.bottom = -z;
+  orthoCamera.updateProjectionMatrix();
+
+  renderer.setSize(w, h);
+});
+
+// ================================================================
+// 键盘快捷键
+// ================================================================
+window.addEventListener("keydown", (e) => {
+  switch (e.key.toLowerCase()) {
+    case "1":
+      switchCamera("3d");
+      break;
+    case "2":
+      switchCamera("top");
+      break;
+    case "3":
+      switchCamera("side");
+      break;
+    case "r":
+      // Reset angles
+      guiState.theta1 = CONFIG.angleDefault[0];
+      guiState.theta2 = CONFIG.angleDefault[1];
+      guiState.theta3 = CONFIG.angleDefault[2];
+      gui.controllers.forEach(c => c.updateDisplay());
+      updateJoints();
+      break;
+  }
+});
+
+console.log("[初始化] 正向运动学演示就绪");
+console.log("  骨骼名称:", CONFIG.boneNames.join(", "));
+console.log("  旋转轴:", CONFIG.rotationAxes.join(", "));
+console.log("  快捷键: 1=3D视图  2=顶视图  3=侧视图  R=重置角度");
+console.log("  等待模型加载...");
+</script>
+
+<!-- ================================================================
+     附录：故障排查指引
+     ================================================================
+     1. 骨骼识别失败 → F12 打开Console，查看"可用对象列表"，
+        确认GLB内骨骼name与 CONFIG.boneNames 完全一致（大小写敏感）。
+        可在Blender中选中骨骼→Object Properties→Name 重命名。
+     2. 关节不转动   → 确认骨骼在GLB中是 isBone 类型（非空Group/Mesh）。
+        在Blender中创建Armature→添加骨骼→绑定网格→导出GLB勾选Skinning。
+     3. 旋转方向反向 → 修改 CONFIG.rotationSigns 对应关节为 -1。
+     4. 模型尺寸错乱 → 代码会自动缩放至3单位内，可在CONFIG调整阈值。
+     5. 2D/3D切换异常 → 检查orthoCamera的left/right/top/bottom是否随resize更新。
+     6. 滑块范围不够 → 修改 CONFIG.angleMin/angleMax。
+     7. 旋转轴不对   → 修改 CONFIG.rotationAxes，常见：Z轴（水平旋转）/ Y轴（垂直） -->
+</body>
+</html>

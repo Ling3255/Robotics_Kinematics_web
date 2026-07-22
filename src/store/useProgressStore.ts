@@ -2,97 +2,90 @@ import { create } from "zustand";
 import { MissionProgress } from "@/types/page";
 
 interface ProgressState {
-  /** Chapter progress map: chapterId → MissionProgress */
-  chapters: Record<number, MissionProgress>;
+  missions: Record<number, MissionProgress>;
 
-  /** Initialize all chapters (call once on app load) */
   initialize: () => void;
 
-  /** Get progress for a specific chapter */
-  getChapterProgress: (chapterId: number) => MissionProgress;
+  getMissionProgress: (missionId: number) => MissionProgress;
 
-  /** Mark a task as completed for a chapter */
-  completeTask: (chapterId: number, taskIndex: number) => void;
+  completeTask: (missionId: number, taskIndex: number) => void;
 
-  /** Unlock a chapter */
-  unlockChapter: (chapterId: number) => void;
+  unlockMission: (missionId: number) => void;
 }
 
 function createInitialProgress(): Record<number, MissionProgress> {
-  const chapters: Record<number, MissionProgress> = {};
-  for (let i = 1; i <= 7; i++) {
-    chapters[i] = {
-      chapterId: i,
+  const missions: Record<number, MissionProgress> = {};
+  for (let i = 1; i <= 6; i++) {
+    missions[i] = {
+      missionId: i,
       currentTask: 0,
       tasksCompleted: 0,
-      isUnlocked: i === 1, // Only Chapter 1 is unlocked initially
+      isUnlocked: true,
     };
   }
-  return chapters;
+  return missions;
 }
 
 export const useProgressStore = create<ProgressState>((set, get) => ({
-  chapters: createInitialProgress(),
+  missions: createInitialProgress(),
 
   initialize: () => {
-    set({ chapters: createInitialProgress() });
+    set({ missions: createInitialProgress() });
   },
 
-  getChapterProgress: (chapterId: number) => {
+  getMissionProgress: (missionId: number) => {
     const state = get();
-    if (!state.chapters[chapterId]) {
-      // Auto-initialize if missing
+    if (!state.missions[missionId]) {
       set({
-        chapters: {
-          ...state.chapters,
-          [chapterId]: {
-            chapterId,
+        missions: {
+          ...state.missions,
+          [missionId]: {
+            missionId,
             currentTask: 0,
             tasksCompleted: 0,
-            isUnlocked: chapterId === 1,
+            isUnlocked: true,
           },
         },
       });
     }
-    return get().chapters[chapterId];
+    return get().missions[missionId];
   },
 
-  completeTask: (chapterId: number, taskIndex: number) => {
+  completeTask: (missionId: number, taskIndex: number) => {
     set((state) => {
-      const chapter = state.chapters[chapterId];
-      if (!chapter) return state;
+      const mission = state.missions[missionId];
+      if (!mission) return state;
 
-      const newTasksCompleted = Math.max(chapter.tasksCompleted, taskIndex + 1);
+      const newTasksCompleted = Math.max(mission.tasksCompleted, taskIndex + 1);
       const allDone = newTasksCompleted >= 3;
 
-      // Unlock next chapter if all tasks done
-      const nextChapter = allDone ? chapterId + 1 : null;
-      const updatedChapters = {
-        ...state.chapters,
-        [chapterId]: {
-          ...chapter,
+      const nextMission = allDone ? missionId + 1 : null;
+      const updatedMissions = {
+        ...state.missions,
+        [missionId]: {
+          ...mission,
           currentTask: Math.min(taskIndex + 1, 3),
           tasksCompleted: newTasksCompleted,
         },
       };
 
-      if (nextChapter && nextChapter <= 7 && updatedChapters[nextChapter]) {
-        updatedChapters[nextChapter] = {
-          ...updatedChapters[nextChapter],
+      if (nextMission && nextMission <= 6 && updatedMissions[nextMission]) {
+        updatedMissions[nextMission] = {
+          ...updatedMissions[nextMission],
           isUnlocked: true,
         };
       }
 
-      return { chapters: updatedChapters };
+      return { missions: updatedMissions };
     });
   },
 
-  unlockChapter: (chapterId: number) => {
+  unlockMission: (missionId: number) => {
     set((state) => ({
-      chapters: {
-        ...state.chapters,
-        [chapterId]: {
-          ...state.chapters[chapterId],
+      missions: {
+        ...state.missions,
+        [missionId]: {
+          ...state.missions[missionId],
           isUnlocked: true,
         },
       },

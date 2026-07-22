@@ -1,6 +1,6 @@
-import { Chapter } from "@/types/page";
+import { Mission } from "@/types/page";
 
-export const CHAPTERS: Chapter[] = [
+export const MISSIONS: Mission[] = [
   {
     id: 1,
     title: "Robot Basics",
@@ -36,11 +36,5 @@ export const CHAPTERS: Chapter[] = [
     title: "Inverse Kinematics",
     path: "/inverse-kinematics",
     description: "Find joint angles to reach a target position",
-  },
-  {
-    id: 7,
-    title: "Advanced Topics",
-    path: "/advanced",
-    description: "Explore advanced kinematics concepts",
   },
 ];

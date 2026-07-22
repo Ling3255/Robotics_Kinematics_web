@@ -1,3 +1,5 @@
-export default function ForwardKinematicsPage() {
-  return <div className="p-8" />;
+import ForwardKinematicsPage from "@/components/pages/ForwardKinematicsPage";
+
+export default function Page() {
+  return <ForwardKinematicsPage />;
 }

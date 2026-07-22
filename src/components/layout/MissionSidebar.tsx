@@ -2,34 +2,34 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { CHAPTERS } from "@/content/chapters";
+import { MISSIONS } from "@/content/missions";
 import { useProgressStore } from "@/store/useProgressStore";
 
-export default function ChapterSidebar() {
+export default function MissionSidebar() {
   const pathname = usePathname();
-  const { getChapterProgress } = useProgressStore();
+  const { getMissionProgress } = useProgressStore();
 
   return (
     <nav className="fixed top-14 left-0 bottom-14 w-[220px] bg-white border-r border-slate-200 flex flex-col py-6 overflow-y-auto z-40">
       {/* Header */}
       <div className="px-5 mb-5">
         <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-[0.15em]">
-          Chapters
+          Missions
         </p>
       </div>
 
-      {/* Chapter list */}
+      {/* Mission list */}
       <div className="flex flex-col gap-0.5 px-3">
-        {CHAPTERS.map((ch) => {
-          const isActive = pathname === ch.path;
-          const progress = getChapterProgress(ch.id);
+        {MISSIONS.map((m) => {
+          const isActive = pathname === m.path;
+          const progress = getMissionProgress(m.id);
           const isLocked = !progress.isUnlocked;
           const isDone = progress.tasksCompleted >= 3;
 
           return (
             <Link
-              key={ch.id}
-              href={isLocked ? "#" : ch.path}
+              key={m.id}
+              href={isLocked ? "#" : m.path}
               onClick={(e) => {
                 if (isLocked) e.preventDefault();
               }}
@@ -43,7 +43,7 @@ export default function ChapterSidebar() {
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }
               `}
-              title={isLocked ? `Complete Chapter ${ch.id - 1} to unlock` : ch.description}
+              title={isLocked ? `Complete Mission ${m.id - 1} to unlock` : m.description}
             >
               {/* Number */}
               <span
@@ -60,11 +60,11 @@ export default function ChapterSidebar() {
                   }
                 `}
               >
-                {String(ch.id).padStart(2, "0")}
+                {String(m.id).padStart(2, "0")}
               </span>
 
               {/* Title */}
-              <span className="truncate flex-1">{ch.title}</span>
+              <span className="truncate flex-1">{m.title}</span>
 
               {/* Status */}
               {isDone && (

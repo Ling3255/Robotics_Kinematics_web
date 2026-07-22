@@ -1,4 +1,4 @@
-export interface Chapter {
+export interface Mission {
   id: number;
   title: string;
   path: string;
@@ -6,7 +6,7 @@ export interface Chapter {
 }
 
 export interface MissionProgress {
-  chapterId: number;
+  missionId: number;
   currentTask: number;
   tasksCompleted: number;
   isUnlocked: boolean;

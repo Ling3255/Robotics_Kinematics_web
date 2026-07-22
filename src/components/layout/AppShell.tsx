@@ -1,12 +1,11 @@
 "use client";
 
 import TopBar from "./TopBar";
-import ChapterSidebar from "./ChapterSidebar";
+import MissionSidebar from "./MissionSidebar";
 import BottomPanel from "./BottomPanel";
 
 interface AppShellProps {
   children: React.ReactNode;
-  /** Bottom panel props — driven by each page */
   bottomPanel?: {
     hint?: string;
     onCheck?: () => void;
@@ -20,18 +19,11 @@ interface AppShellProps {
 export default function AppShell({ children, bottomPanel }: AppShellProps) {
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Top navigation bar */}
       <TopBar />
-
-      {/* Left chapter sidebar */}
-      <ChapterSidebar />
-
-      {/* Main content area */}
+      <MissionSidebar />
       <main className="mt-14 mb-14 ml-[220px] min-h-[calc(100vh-112px)]">
         {children}
       </main>
-
-      {/* Bottom action panel */}
       <BottomPanel
         hint={bottomPanel?.hint}
         onCheck={bottomPanel?.onCheck}

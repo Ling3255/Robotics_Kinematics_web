@@ -1,16 +1,16 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { CHAPTERS } from "@/content/chapters";
+import { MISSIONS } from "@/content/missions";
 import { useProgressStore } from "@/store/useProgressStore";
 import StepProgress from "./StepProgress";
 
 export default function TopBar() {
   const pathname = usePathname();
-  const { getChapterProgress } = useProgressStore();
+  const { getMissionProgress } = useProgressStore();
 
-  const currentChapter = CHAPTERS.find((ch) => ch.path === pathname);
-  const progress = currentChapter ? getChapterProgress(currentChapter.id) : null;
+  const currentMission = MISSIONS.find((m) => m.path === pathname);
+  const progress = currentMission ? getMissionProgress(currentMission.id) : null;
 
   return (
     <header className="h-14 bg-white border-b border-slate-200 flex items-center px-6 gap-4 fixed top-0 left-0 right-0 z-50">
@@ -27,15 +27,15 @@ export default function TopBar() {
 
       <div className="flex-1" />
 
-      {/* Chapter indicator */}
-      {currentChapter && (
+      {/* Mission indicator */}
+      {currentMission && (
         <div className="flex items-center gap-4">
           <span className="text-[13px] text-slate-500">
             <span className="font-semibold text-slate-700">
-              Chapter {currentChapter.id}
+              Mission {currentMission.id}
             </span>
             <span className="mx-2 text-slate-300">/</span>
-            {currentChapter.title}
+            {currentMission.title}
           </span>
           {progress && progress.isUnlocked && (
             <StepProgress current={progress.tasksCompleted} total={3} />
