@@ -4,8 +4,10 @@ interface BottomPanelProps {
   hint?: string;
   onCheck?: () => void;
   onNext?: () => void;
+  onReset?: () => void;
   checkDisabled?: boolean;
   nextDisabled?: boolean;
+  resetDisabled?: boolean;
   checkLabel?: string;
 }
 
@@ -13,9 +15,11 @@ export default function BottomPanel({
   hint = "Ready to start. Follow the instructions on screen.",
   onCheck,
   onNext,
+  onReset,
   checkDisabled = true,
   nextDisabled = true,
-  checkLabel = "Check",
+  resetDisabled = true,
+  checkLabel = "Previous",
 }: BottomPanelProps) {
   return (
     <footer className="fixed bottom-0 left-[220px] right-0 h-14 bg-white border-t border-slate-200 flex items-center px-5 gap-3 z-50">
@@ -29,7 +33,22 @@ export default function BottomPanel({
         </span>
       </div>
 
-      {/* Check */}
+      {/* Reset */}
+      <button
+        onClick={onReset}
+        disabled={resetDisabled}
+        className={`
+          px-4 py-1.5 rounded-md text-[13px] font-medium border transition-all flex-shrink-0
+          ${resetDisabled
+            ? "border-slate-200 text-slate-300 cursor-not-allowed"
+            : "border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400 cursor-pointer"
+          }
+        `}
+      >
+        Reset
+      </button>
+
+      {/* Previous */}
       <button
         onClick={onCheck}
         disabled={checkDisabled}

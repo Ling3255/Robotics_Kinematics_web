@@ -3,6 +3,7 @@
 import TopBar from "./TopBar";
 import MissionSidebar from "./MissionSidebar";
 import BottomPanel from "./BottomPanel";
+import { useBottomPanelStore } from "@/store/useBottomPanelStore";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -10,27 +11,36 @@ interface AppShellProps {
     hint?: string;
     onCheck?: () => void;
     onNext?: () => void;
+    onReset?: () => void;
     checkDisabled?: boolean;
     nextDisabled?: boolean;
+    resetDisabled?: boolean;
     checkLabel?: string;
   };
 }
 
 export default function AppShell({ children, bottomPanel }: AppShellProps) {
+  const configuredBottomPanel = useBottomPanelStore((state) => state.config);
+  const panel = bottomPanel ?? configuredBottomPanel;
+
   return (
     <div className="min-h-screen bg-slate-50">
       <TopBar />
       <MissionSidebar />
-      <main className="mt-14 mb-14 ml-[220px] min-h-[calc(100vh-112px)]">
+
+      <main className="ml-[220px] mt-14 min-h-[calc(100vh-112px)]">
         {children}
       </main>
+
       <BottomPanel
-        hint={bottomPanel?.hint}
-        onCheck={bottomPanel?.onCheck}
-        onNext={bottomPanel?.onNext}
-        checkDisabled={bottomPanel?.checkDisabled ?? true}
-        nextDisabled={bottomPanel?.nextDisabled ?? true}
-        checkLabel={bottomPanel?.checkLabel}
+        hint={panel.hint}
+        onCheck={panel.onCheck}
+        onNext={panel.onNext}
+        onReset={panel.onReset}
+        checkDisabled={panel.checkDisabled ?? true}
+        nextDisabled={panel.nextDisabled ?? true}
+        resetDisabled={panel.resetDisabled ?? true}
+        checkLabel={panel.checkLabel}
       />
     </div>
   );
