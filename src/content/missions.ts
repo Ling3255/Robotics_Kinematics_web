@@ -2,6 +2,12 @@ import { Mission } from "@/types/page";
 
 export const MISSIONS: Mission[] = [
   {
+    id: 0,
+    title: "Assemble",
+    path: "/assemble",
+    description: "Drag and drop parts to build your own robotic arm",
+  },
+  {
     id: 1,
     title: "Robot Basics",
     path: "/robot-basics",
