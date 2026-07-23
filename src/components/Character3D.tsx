@@ -5,27 +5,6 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import type { Group } from "three";
 
-<<<<<<< HEAD
-/** Movement speed per frame */
-const SPEED = 0.08;
-
-/** Keyboard key set */
-type KeyMap = Record<string, boolean>;
-
-export default function Character3D() {
-  const groupRef = useRef<Group>(null!);
-
-  // Load the GLTF model
-  const { scene, animations } = useGLTF("/models/run2.glb");
-  const { actions } = useAnimations(animations, groupRef);
-
-  // Track pressed keys
-  const [keys, setKeys] = useState<KeyMap>({});
-
-  // --- Keyboard event listeners ---
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-=======
 const SPEED = 0.08;
 
 type KeyMap = Record<string, boolean>;
@@ -52,7 +31,6 @@ export default function Character3D({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space") e.preventDefault();
->>>>>>> 9ad57a4056c5a1a97cf3058fbfd2edd08c21ff58
       setKeys((prev) => ({ ...prev, [e.code]: true }));
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -67,10 +45,6 @@ export default function Character3D({
     };
   }, []);
 
-<<<<<<< HEAD
-  // --- Auto-play the "run" animation ---
-=======
->>>>>>> 9ad57a4056c5a1a97cf3058fbfd2edd08c21ff58
   useEffect(() => {
     const action = actions?.[Object.keys(actions ?? {})[0]];
     if (action) {
@@ -78,32 +52,11 @@ export default function Character3D({
     }
   }, [actions]);
 
-<<<<<<< HEAD
-  // --- Per-frame movement logic ---
-=======
->>>>>>> 9ad57a4056c5a1a97cf3058fbfd2edd08c21ff58
   useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
 
     let dx = 0;
-<<<<<<< HEAD
-    let dz = 0;
-
-    // WASD
-    if (keys["KeyW"] || keys["ArrowUp"]) dz -= SPEED;
-    if (keys["KeyS"] || keys["ArrowDown"]) dz += SPEED;
-    if (keys["KeyA"] || keys["ArrowLeft"]) dx -= SPEED;
-    if (keys["KeyD"] || keys["ArrowRight"]) dx += SPEED;
-
-    // Only move & rotate when there is actual input
-    if (dx !== 0 || dz !== 0) {
-      group.position.x += dx;
-      group.position.z += dz;
-
-      // Face the movement direction (radians)
-      group.rotation.y = Math.atan2(dx, dz);
-=======
     let dy = 0;
     let dz = 0;
 
@@ -133,7 +86,6 @@ export default function Character3D({
       posRef.current.x = logicalPosRef.current.x;
       posRef.current.y = logicalPosRef.current.y;
       posRef.current.z = logicalPosRef.current.z;
->>>>>>> 9ad57a4056c5a1a97cf3058fbfd2edd08c21ff58
     }
   });
 
@@ -142,8 +94,4 @@ export default function Character3D({
       <primitive object={scene} />
     </group>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 9ad57a4056c5a1a97cf3058fbfd2edd08c21ff58
