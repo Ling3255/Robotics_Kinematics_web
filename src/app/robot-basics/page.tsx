@@ -1,3 +1,5 @@
+import RobotBasicsLesson from "./RobotBasicsLesson";
+
 export default function RobotBasicsPage() {
-  return <div className="p-8" />;
+  return <RobotBasicsLesson />;
 }

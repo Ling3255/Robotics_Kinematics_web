@@ -1,3 +1,10 @@
+import BlankFirstPageLesson from "@/components/lessons/BlankFirstPageLesson";
+
 export default function ForwardKinematicsPage() {
-  return <div className="p-8" />;
+  return (
+    <BlankFirstPageLesson
+      title="Forward Kinematics"
+      description="Build the end-effector pose from joint values and link geometry."
+    />
+  );
 }

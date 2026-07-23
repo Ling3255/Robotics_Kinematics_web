@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 "use client";
 
 import { Canvas } from "@react-three/fiber";
@@ -22,4 +23,10 @@ export default function HomePage() {
       <div className="relative z-10 p-8" />
     </>
   );
+=======
+import FbxViewer from './robot-basics/FbxViewer';
+
+export default function HomePage() {
+  return <FbxViewer />;
+>>>>>>> 9ad57a4056c5a1a97cf3058fbfd2edd08c21ff58
 }

@@ -1,3 +1,5 @@
+import OrientationLesson from "./OrientationLesson";
+
 export default function OrientationPage() {
-  return <div className="p-8" />;
+  return <OrientationLesson />;
 }
