@@ -2,12 +2,6 @@ import { Mission } from "@/types/page";
 
 export const MISSIONS: Mission[] = [
   {
-    id: 0,
-    title: "Assemble",
-    path: "/assemble",
-    description: "Drag and drop parts to build your own robotic arm",
-  },
-  {
     id: 1,
     title: "Robot Basics",
     path: "/robot-basics",
@@ -42,5 +36,11 @@ export const MISSIONS: Mission[] = [
     title: "Inverse Kinematics",
     path: "/inverse-kinematics",
     description: "Find joint angles to reach a target position",
+  },
+  {
+    id: 7,
+    title: "Advanced",
+    path: "/advanced",
+    description: "Connect the previous concepts into more complete robotic motion workflows",
   },
 ];

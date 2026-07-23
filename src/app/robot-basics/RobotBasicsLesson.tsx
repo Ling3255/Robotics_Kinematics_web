@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useBottomPanelStore } from "@/store/useBottomPanelStore";
+import AssemblyPage from "@/components/pages/AssemblyPage";
 import FbxViewer from "./FbxViewer";
 
 export default function RobotBasicsLesson() {
@@ -14,7 +15,7 @@ export default function RobotBasicsLesson() {
 
     if (page === 1) {
       setBottomPanel({
-        hint: "Click Next to view the character and robotic arm demonstration.",
+        hint: "Drag and drop parts to build your own robotic arm.",
         checkDisabled: true,
         checkLabel: "Previous",
         nextDisabled: false,
@@ -25,11 +26,25 @@ export default function RobotBasicsLesson() {
       return;
     }
 
+    if (page === 2) {
+      setBottomPanel({
+        hint: "Click Next to view the character and robotic arm demonstration.",
+        checkDisabled: false,
+        checkLabel: "Previous",
+        onCheck: () => setPage(1),
+        nextDisabled: false,
+        resetDisabled: false,
+        onReset: resetLesson,
+        onNext: () => setPage(3),
+      });
+      return;
+    }
+
     setBottomPanel({
       hint: "Observe the raised-arm pose and the robotic arm side by side.",
       checkDisabled: false,
       checkLabel: "Previous",
-      onCheck: () => setPage(1),
+      onCheck: () => setPage(2),
       nextDisabled: true,
       resetDisabled: false,
       onReset: resetLesson,
@@ -39,6 +54,10 @@ export default function RobotBasicsLesson() {
   useEffect(() => resetBottomPanel, [resetBottomPanel]);
 
   if (page === 1) {
+    return <AssemblyPage />;
+  }
+
+  if (page === 2) {
     return <div className="h-full w-full bg-slate-50" />;
   }
 

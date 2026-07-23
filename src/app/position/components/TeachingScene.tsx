@@ -86,8 +86,6 @@ function Room({ showAxes, highlightAxes }: { showAxes: boolean; highlightAxes: b
         <sphereGeometry args={[0.055, 24, 24]} />
         <meshStandardMaterial color="#111827" />
       </mesh>
-      <Label position={[U_WORLD[0] - 0.14, U_WORLD[1] + 0.18, U_WORLD[2] - 0.1]} className="text-slate-900">U</Label>
-
       {showAxes && (
         <group>
           <AxisArrow direction={[1, 0, 0]} color="#ef4444" />
@@ -108,7 +106,7 @@ function Room({ showAxes, highlightAxes }: { showAxes: boolean; highlightAxes: b
 function BallModel({ selected }: { selected: boolean }) {
   return (
     <mesh castShadow receiveShadow>
-      <sphereGeometry args={[0.14, 32, 32]} />
+      <sphereGeometry args={[0.17, 32, 32]} />
       <meshStandardMaterial
         color={selected ? "#9ca3af" : "#d1d5db"}
         roughness={0.55}
@@ -122,7 +120,6 @@ function StaticQ({ position = INITIAL_Q_POSITION }: { position?: Vec3Position })
   return (
     <group position={qToWorld(position)}>
       <BallModel selected={false} />
-      <Label position={[0, 0.22, 0]} className="text-slate-700">Q</Label>
     </group>
   );
 }
@@ -138,7 +135,6 @@ function ProjectionAndVector({ position }: { position: Vec3Position }) {
       <Line points={[U_WORLD, xPoint]} color="#ef4444" lineWidth={2} dashed dashSize={0.12} gapSize={0.08} />
       <Line points={[xPoint, xyPoint]} color="#111827" lineWidth={2} dashed dashSize={0.12} gapSize={0.08} />
       <Line points={[xyPoint, q]} color="#2563eb" lineWidth={2} dashed dashSize={0.12} gapSize={0.08} />
-      <Label position={[(U_WORLD[0] + q[0]) / 2 + 0.18, (U_WORLD[1] + q[1]) / 2 + 0.2, (U_WORLD[2] + q[2]) / 2]} className="text-red-600">UQ</Label>
     </group>
   );
 }
@@ -290,11 +286,10 @@ function MovableQ({
   return (
     <group ref={groupRef} position={qToWorld(position)} onPointerDown={(event) => { event.stopPropagation(); setSelected(true); }}>
       <mesh visible={selected} position={[0, 0, 0]}>
-        <sphereGeometry args={[0.15, 32, 32]} />
+        <sphereGeometry args={[0.19, 32, 32]} />
         <meshBasicMaterial color="#9ca3af" transparent opacity={0.18} />
       </mesh>
       <BallModel selected={selected} />
-      <Label position={[0, 0.22, 0]} className={selected ? "text-slate-700 ring-slate-400" : "text-slate-700"}>Q</Label>
       <AxisDragHandle axis="x" color="#ef4444" direction={[1, 0, 0]} selected={selected} onSelect={() => setSelected(true)} onDrag={dragAxis} />
       <AxisDragHandle axis="y" color="#111827" direction={[0, 0, -1]} selected={selected} onSelect={() => setSelected(true)} onDrag={dragAxis} />
       <AxisDragHandle axis="z" color="#2563eb" direction={[0, 1, 0]} selected={selected} onSelect={() => setSelected(true)} onDrag={dragAxis} />
@@ -308,7 +303,6 @@ function TargetMarker() {
         <sphereGeometry args={[0.18, 24, 24]} />
         <meshBasicMaterial color="#9ca3af" transparent opacity={0.28} />
       </mesh>
-      <Label position={[0, 0.34, 0]} className="text-slate-600">Target</Label>
     </group>
   );
 }

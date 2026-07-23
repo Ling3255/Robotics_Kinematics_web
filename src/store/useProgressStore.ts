@@ -15,7 +15,7 @@ interface ProgressState {
 
 function createInitialProgress(): Record<number, MissionProgress> {
   const missions: Record<number, MissionProgress> = {};
-  for (let i = 0; i <= 6; i++) {
+  for (let i = 1; i <= 7; i++) {
     missions[i] = {
       missionId: i,
       currentTask: 0,
@@ -69,7 +69,7 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
         },
       };
 
-      if (nextMission && nextMission <= 6 && updatedMissions[nextMission]) {
+      if (nextMission && nextMission <= 7 && updatedMissions[nextMission]) {
         updatedMissions[nextMission] = {
           ...updatedMissions[nextMission],
           isUnlocked: true,
