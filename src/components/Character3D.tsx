@@ -5,8 +5,10 @@ import { useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
 import type { Group } from "three";
 
+/** Movement speed per frame */
 const SPEED = 0.08;
 
+/** Keyboard key set */
 type KeyMap = Record<string, boolean>;
 
 export interface CharacterPos {
@@ -28,6 +30,7 @@ export default function Character3D({
 
   const [keys, setKeys] = useState<KeyMap>({});
 
+  // Keyboard event listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space") e.preventDefault();
@@ -45,6 +48,7 @@ export default function Character3D({
     };
   }, []);
 
+  // Auto-play animation
   useEffect(() => {
     const action = actions?.[Object.keys(actions ?? {})[0]];
     if (action) {
@@ -52,6 +56,7 @@ export default function Character3D({
     }
   }, [actions]);
 
+  // Per-frame movement logic
   useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
