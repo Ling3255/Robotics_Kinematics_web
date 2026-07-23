@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import BottomPanel from "@/components/layout/BottomPanel";
+import HintBox from "@/components/ui/HintBox";
 import { CFG } from "@/components/three/ForwardKinematicsScene";
 
 const ThreeCanvasWrapper = dynamic(
@@ -98,7 +99,7 @@ export default function ForwardKinematicsPage() {
       {/* ===== Content ===== */}
       <div className="flex-1 flex gap-5 px-8 pb-4 min-h-0 overflow-hidden">
         {/* 3D Canvas */}
-        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-w-0 relative">
           <ThreeCanvasWrapper background="#f8fafc" orthographic={mode2D}>
             <ForwardKinematicsScene
               angles={angles}
@@ -106,6 +107,12 @@ export default function ForwardKinematicsPage() {
               onReady={(ok) => { setModelReady(ok); }}
             />
           </ThreeCanvasWrapper>
+          <HintBox hintLabel="Controls">
+            <p>Drag with left mouse button: rotate view</p>
+            <p>Scroll: zoom in / out</p>
+            <p>Right-drag: pan view</p>
+            <p>Adjust the joint angle sliders to see how the arm moves</p>
+          </HintBox>
         </div>
 
         {/* Right panel */}

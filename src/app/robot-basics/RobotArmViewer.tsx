@@ -5,6 +5,7 @@ import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { GLTFLoader, type OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
+import HintBox from '@/components/ui/HintBox';
 
 const MESH_URLS = [
   '/meshes/irb4600/IRB4600_20kg-250_BASE.glb',
@@ -582,12 +583,12 @@ export default function RobotArmViewer() {
         <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">Loading robot arm model...</div>
       )}
 
-      <div className="absolute left-4 top-4 z-10 rounded-lg bg-white/90 px-3 py-2 text-xs leading-5 text-gray-600 shadow-lg backdrop-blur">
+      <HintBox hintLabel="Controls">
         <p>Drag with the left mouse button: rotate view</p>
         <p>Mouse wheel: zoom view</p>
         <p>Drag the end-effector sphere to adjust the pose</p>
         <p>Hover robot parts or labels to highlight matching components</p>
-      </div>
+      </HintBox>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import HintBox from "@/components/ui/HintBox";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html, Line, OrbitControls, useProgress } from "@react-three/drei";
 import {
@@ -345,10 +346,10 @@ export default function TeachingScene(props: TeachingSceneProps) {
         </Suspense>
       </Canvas>
       <LoadingOverlay />
-      <div className="absolute left-4 top-4 rounded-xl bg-white/90 px-3 py-2 text-xs font-semibold leading-5 text-slate-600 shadow-sm backdrop-blur">
+      <HintBox hintLabel="Controls">
         <p>Right drag to rotate camera. Scroll to zoom.</p>
         {props.step === 3 && <p>Drag the axis arrows on Q to move it onto the Target marker.</p>}
-      </div>
+      </HintBox>
     </div>
   );
 }

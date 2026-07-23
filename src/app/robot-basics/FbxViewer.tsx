@@ -6,6 +6,7 @@ import { OrbitControls } from '@react-three/drei';
 import { FBXLoader, SkeletonUtils, type OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import * as THREE from 'three';
 import RobotArmViewer from './RobotArmViewer';
+import HintBox from '@/components/ui/HintBox';
 
 interface JointData {
   bone: THREE.Bone;
@@ -535,7 +536,6 @@ function CameraSetup() {
 
 export default function FbxViewer() {
   const [replayTick, setReplayTick] = useState(0);
-  const [hintsCollapsed, setHintsCollapsed] = useState(false);
   const overlayRefsRef = useRef<OverlayRefsMap>(new Map());
   const timelineStateRef = useRef<TimelineState>({
     phase: 'raising',
@@ -569,61 +569,12 @@ export default function FbxViewer() {
             timelineStateRef={timelineStateRef}
           />
 
-          <div className="absolute left-4 top-4 z-10 flex flex-col items-start gap-2">
-            <button
-              onClick={() => setReplayTick((n) => n + 1)}
-              className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-gray-700 shadow-lg backdrop-blur hover:bg-white"
-            >Replay</button>
-            {hintsCollapsed ? (
-              <button
-                onClick={() => setHintsCollapsed(false)}
-                className="rounded-lg bg-white/90 p-2 text-gray-500 shadow-lg backdrop-blur hover:bg-white hover:text-gray-700"
-                aria-label="Show hints"
-                title="Controls"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </button>
-            ) : (
-              <div className="rounded-lg bg-white/90 px-3 py-2 text-xs leading-5 text-gray-600 shadow-lg backdrop-blur">
-                <p>Drag with the left mouse button: rotate view</p>
-                <p>Shift + left drag: pan view</p>
-                <p>Mouse wheel: zoom view</p>
-                <p>After the pose holds, drag the character&apos;s left hand to adjust the arm pose</p>
-                <div className="mt-1 flex justify-end">
-                  <button
-                    onClick={() => setHintsCollapsed(true)}
-                    className="text-gray-400 hover:text-gray-600"
-                    aria-label="Hide hints"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M5 12h14" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <HintBox onReplay={() => setReplayTick((n) => n + 1)} hintLabel="Controls">
+            <p>Drag with the left mouse button: rotate view</p>
+            <p>Shift + left drag: pan view</p>
+            <p>Mouse wheel: zoom view</p>
+            <p>After the pose holds, drag the character&apos;s left hand to adjust the arm pose</p>
+          </HintBox>
         </div>
 
         <div className="relative h-full w-1/2 border-l-2 border-gray-300">

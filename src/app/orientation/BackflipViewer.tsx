@@ -5,6 +5,7 @@ import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { FBXLoader, SkeletonUtils } from "three-stdlib";
 import * as THREE from "three";
+import HintBox from "@/components/ui/HintBox";
 
 const MODEL_URL = "/models/Backflip.fbx";
 const INITIAL_ROTATION_MATRIX = [1, 0, 0, 0, 1, 0, 0, 0, 1];
@@ -184,10 +185,10 @@ export default function BackflipViewer() {
 
         <div className="relative h-full w-1/2 border-l-2 border-gray-300 bg-gradient-to-br from-gray-50 to-gray-100">
           <CubeScene orientationRef={orientationRef} />
-          <div className="absolute left-4 top-4 z-10 rounded-lg bg-white/90 px-3 py-2 shadow-lg backdrop-blur">
+          <HintBox hintLabel="Orientation Info">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Orientation</p>
             <p className="mt-1 text-sm text-gray-700">Watch the character flip, cube rotation, and matrix values change together.</p>
-          </div>
+          </HintBox>
           <RotationMatrixPanel matrixRef={matrixRef} />
         </div>
       </div>

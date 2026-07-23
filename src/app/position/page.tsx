@@ -5,6 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { GizmoHelper, GizmoViewport, useProgress } from "@react-three/drei";
 import { useBottomPanelStore } from "@/store/useBottomPanelStore";
 import Character3D, { type CharacterPos } from "@/components/Character3D";
+import HintBox from "@/components/ui/HintBox";
 import AxisMatchingPanel, { isAxisMatchingComplete } from "./components/AxisMatchingPanel";
 import PositionVectorPanel from "./components/PositionVectorPanel";
 import ReferenceFrameQuiz from "./components/ReferenceFrameQuiz";
@@ -71,11 +72,11 @@ function PositionScene() {
       <LoadingOverlay />
       <CoordinateOverlay posRef={posRef} />
 
-      <div className="absolute left-4 top-4 z-10 rounded-lg bg-white/90 px-3 py-2 text-xs leading-5 text-gray-600 shadow-lg backdrop-blur">
+      <HintBox hintLabel="Controls">
         <p>WASD / arrow keys: move on the X-Y plane</p>
         <p>Hold Space: move upward along +Z</p>
         <p>Hold Shift: move downward along -Z</p>
-      </div>
+      </HintBox>
     </div>
   );
 }

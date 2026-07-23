@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import HintBox from "@/components/ui/HintBox";
 import { Canvas, type ThreeEvent, useThree } from "@react-three/fiber";
 import { Html, MeshTransmissionMaterial, OrbitControls, useProgress } from "@react-three/drei";
 import {
@@ -288,10 +289,10 @@ export default function RotationSphereScene({ resetKey, matrixRef, onMatrixChang
         </Suspense>
       </Canvas>
       <LoadingOverlay />
-      <div className="absolute left-4 top-4 z-10 rounded-xl bg-white/90 px-3 py-2 text-xs font-semibold leading-5 text-slate-600 shadow-sm backdrop-blur">
+      <HintBox hintLabel="Controls">
         <p>Drag the sphere to rotate. Right-drag to orbit camera. Scroll to zoom.</p>
         <p>X axis: red · Y axis: black · Z axis: blue</p>
-      </div>
+      </HintBox>
     </div>
   );
 }
