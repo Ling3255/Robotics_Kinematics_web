@@ -2,9 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
-import { OrbitControls, useProgress, useTexture, useGLTF } from "@react-three/drei";
-import { FBXLoader } from "three-stdlib";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useProgress, useTexture, useGLTF, useAnimations } from "@react-three/drei";
 import {
   Physics,
   RigidBody,
@@ -85,16 +84,18 @@ function Coin({ position, collected }: { position: [number, number, number]; col
   if (collected) return null;
 
   return (
-    <mesh ref={meshRef} position={position} castShadow>
-      <cylinderGeometry args={[COIN_RADIUS, COIN_RADIUS, 0.08, 16]} />
-      <meshStandardMaterial
-        color="#fbbf24"
-        roughness={0.3}
-        metalness={0.8}
-        emissive="#fbbf24"
-        emissiveIntensity={0.15}
-      />
-    </mesh>
+    <group position={position}>
+      <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[COIN_RADIUS, COIN_RADIUS, 0.08, 16]} />
+        <meshStandardMaterial
+          color="#fbbf24"
+          roughness={0.3}
+          metalness={0.8}
+          emissive="#fbbf24"
+          emissiveIntensity={0.15}
+        />
+      </mesh>
+    </group>
   );
 }
 
@@ -506,7 +507,7 @@ function Bridge({
 }
 
 // ============================================================
-// Character (FBX girl model)
+// Character (run2.glb model)
 // ============================================================
 function Character({
   posRef,
@@ -515,20 +516,22 @@ function Character({
   posRef: React.MutableRefObject<THREE.Vector3>;
   frozen: boolean;
 }) {
-  const fbx = useLoader(FBXLoader, "/Silly Dancing.fbx");
-  const clonedFbx = useMemo(() => fbx.clone(true), [fbx]);
+  const { scene, animations } = useGLTF("/models/run2.glb");
+  const { actions } = useAnimations(animations);
+  const clonedScene = useMemo(() => scene.clone(true), [scene]);
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const characterRef = useRef<THREE.Group>(null);
   const keysRef = useRef<Record<string, boolean>>({});
   const cameraTarget = useRef(new THREE.Vector3());
   const { camera } = useThree();
 
-  // Scale the model to appropriate size
-  const scale = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(clonedFbx);
-    const size = box.getSize(new THREE.Vector3());
-    return size.y > 0 ? 1.8 / size.y : 1;
-  }, [clonedFbx]);
+  // Auto-play animation
+  useEffect(() => {
+    const action = actions?.[Object.keys(actions ?? {})[0]];
+    if (action) {
+      action.reset().play();
+    }
+  }, [actions]);
 
   // Keyboard listeners
   useEffect(() => {
@@ -620,8 +623,8 @@ function Character({
       mass={1}
       friction={0.5}
     >
-      <group ref={characterRef} scale={scale}>
-        <primitive object={clonedFbx} />
+      <group ref={characterRef} scale={0.8}>
+        <primitive object={clonedScene} />
       </group>
       <CuboidCollider args={[0.3, 0.8, 0.3]} position={[0, 0.8, 0]} />
       {/* Origin marker - small glowing ball at feet */}
@@ -803,6 +806,60 @@ function generateCoins(count: number): CoinData[] {
 }
 
 // ============================================================
+// Play bell sound using Web Audio API
+// ============================================================
+function playBellSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(1200, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.1);
+
+    gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.3);
+  } catch {
+    // Audio not available
+  }
+}
+
+// ============================================================
+// Coordinate overlay (top-right)
+// ============================================================
+function CoordinateOverlay({ posRef }: { posRef: React.MutableRefObject<THREE.Vector3> }) {
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    let rafId: number;
+    const tick = () => {
+      if (textRef.current) {
+        const p = posRef.current;
+        textRef.current.textContent = `X ${p.x.toFixed(2)}  Y ${p.y.toFixed(2)}  Z ${p.z.toFixed(2)}`;
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [posRef]);
+
+  return (
+    <div className="absolute right-4 top-4 z-10 rounded-lg bg-white/90 px-4 py-3 shadow-lg backdrop-blur">
+      <span ref={textRef} className="font-mono text-base font-bold tabular-nums text-gray-700">
+        X 0.00  Y 0.00  Z 0.00
+      </span>
+    </div>
+  );
+}
+
+// ============================================================
 // Main GameScene component
 // ============================================================
 export default function GameScene() {
@@ -833,14 +890,8 @@ export default function GameScene() {
         );
         const newRemaining = updated.filter((c) => !c.collected).length;
 
-        // Play sound
-        try {
-          const audio = new Audio("/sounds/coin.mp3");
-          audio.volume = 0.5;
-          audio.play().catch(() => {});
-        } catch {
-          // Sound file may not exist
-        }
+        // Play bell sound on coin collection
+        playBellSound();
 
         // Check win condition
         if (newRemaining === 0) {
@@ -877,6 +928,7 @@ export default function GameScene() {
 
       <LoadingOverlay />
       <CoinCounter remaining={remaining} />
+      <CoordinateOverlay posRef={posRef} />
       {won && <WinOverlay />}
 
       <HintBox hintLabel="Controls">
