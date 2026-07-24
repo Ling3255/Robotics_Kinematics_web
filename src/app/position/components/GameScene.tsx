@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useProgress, useTexture, useGLTF, useAnimations } from "@react-three/drei";
+import { useTexture } from "@react-three/drei";
 import {
   Physics,
   RigidBody,
@@ -12,6 +12,7 @@ import {
   type RapierRigidBody,
 } from "@react-three/rapier";
 import HintBox from "@/components/ui/HintBox";
+import tileCategories from "@/data/tile-categories.json";
 
 // ============================================================
 // Constants
@@ -20,9 +21,10 @@ const MAP_BOUNDARY = 15;
 const WALK_SPEED = 4.5;
 const SPRINT_MULTIPLIER = 2.0;
 const JUMP_FORCE = 5.0;
-const COIN_COUNT = 20;
+const COIN_COUNT = 8;
 const COIN_RADIUS = 0.4;
 const COLLECT_DISTANCE = 0.8;
+const TILE_SIZE = 3;
 
 // ============================================================
 // Types
@@ -32,6 +34,8 @@ interface CoinData {
   position: [number, number, number];
   collected: boolean;
 }
+
+type TileCategory = keyof typeof tileCategories;
 
 // ============================================================
 // Skybox (equirectangular panorama)
@@ -55,15 +59,13 @@ function Skybox() {
 }
 
 // ============================================================
-// Loading overlay
+// Loading overlay — controlled by parent via `visible` prop
 // ============================================================
-function LoadingOverlay() {
-  const { active, progress } = useProgress();
-  if (!active || progress >= 100) return null;
-  const displayProgress = isFinite(progress) ? progress.toFixed(0) : "0";
+function LoadingOverlay({ visible }: { visible: boolean }) {
+  if (!visible) return null;
   return (
     <div className="absolute inset-0 z-[6] flex items-center justify-center bg-gray-50/60 text-sm text-gray-400">
-      Loading world... {displayProgress}%
+      Loading world...
     </div>
   );
 }
@@ -74,9 +76,9 @@ function LoadingOverlay() {
 function Coin({ position, collected }: { position: [number, number, number]; collected: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null);
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (meshRef.current && !collected) {
-      meshRef.current.rotation.y += delta * 2;
+      meshRef.current.rotation.y += 0.03;
       meshRef.current.position.y = position[1] + Math.sin(Date.now() / 300) * 0.1;
     }
   });
@@ -111,19 +113,20 @@ function CoinCollider({
   onCollect: (id: number) => void;
   collectedSet: React.MutableRefObject<Set<number>>;
 }) {
-  const bodyRef = useRef<RapierRigidBody>(null);
-
   const handleIntersection = useCallback(() => {
-    // Use the ref-based set to prevent duplicate triggers
+    if (coin.collected) return;
     if (collectedSet.current.has(coin.id)) return;
     collectedSet.current.add(coin.id);
     onCollect(coin.id);
-  }, [coin.id, onCollect, collectedSet]);
+  }, [coin.id, coin.collected, onCollect, collectedSet]);
+
+  const pos: [number, number, number] = coin.collected
+    ? [9999, 9999, 9999]
+    : coin.position;
 
   return (
     <RigidBody
-      ref={bodyRef}
-      position={coin.position}
+      position={pos}
       type="fixed"
       sensor
       onIntersectionEnter={handleIntersection}
@@ -134,264 +137,20 @@ function CoinCollider({
 }
 
 // ============================================================
-// Road tile paths (all .gltf files from public/models/road tiles/)
+// Tile helpers (no longer used — kept for reference)
 // ============================================================
-const TILE_PATHS = (() => {
-  // Generate all 189 tile paths
-  const paths: string[] = [];
-  const tiles: { prefix: string; suffix: string }[] = [
-    { prefix: "roadTile_001", suffix: " (1)" },
-    { prefix: "roadTile_002", suffix: " (1)" },
-    { prefix: "roadTile_003", suffix: " (1)" },
-    { prefix: "roadTile_004", suffix: " (1)" },
-    { prefix: "roadTile_005", suffix: "" },
-    { prefix: "roadTile_006", suffix: " (1)" },
-    { prefix: "roadTile_007", suffix: "" },
-    { prefix: "roadTile_008", suffix: "" },
-    { prefix: "roadTile_009", suffix: "" },
-    { prefix: "roadTile_010", suffix: " (1)" },
-    { prefix: "roadTile_011", suffix: " (1)" },
-    { prefix: "roadTile_012", suffix: " (2)" },
-    { prefix: "roadTile_012", suffix: " (3)" },
-    { prefix: "roadTile_013", suffix: " (2)" },
-    { prefix: "roadTile_013", suffix: " (3)" },
-    { prefix: "roadTile_014", suffix: " (2)" },
-    { prefix: "roadTile_014", suffix: " (3)" },
-    { prefix: "roadTile_015", suffix: " (2)" },
-    { prefix: "roadTile_015", suffix: " (3)" },
-    { prefix: "roadTile_016", suffix: " (2)" },
-    { prefix: "roadTile_016", suffix: " (3)" },
-    { prefix: "roadTile_017", suffix: " (1)" },
-    { prefix: "roadTile_017", suffix: " (2)" },
-    { prefix: "roadTile_018", suffix: " (1)" },
-    { prefix: "roadTile_018", suffix: " (2)" },
-    { prefix: "roadTile_019", suffix: " (1)" },
-    { prefix: "roadTile_019", suffix: " (2)" },
-    { prefix: "roadTile_020", suffix: " (1)" },
-    { prefix: "roadTile_020", suffix: " (2)" },
-    { prefix: "roadTile_021", suffix: " (1)" },
-    { prefix: "roadTile_021", suffix: " (2)" },
-    { prefix: "roadTile_022", suffix: " (1)" },
-    { prefix: "roadTile_022", suffix: "" },
-    { prefix: "roadTile_023", suffix: " (1)" },
-    { prefix: "roadTile_024", suffix: " (1)" },
-    { prefix: "roadTile_025", suffix: " (1)" },
-    { prefix: "roadTile_026", suffix: " (2)" },
-    { prefix: "roadTile_027", suffix: " (2)" },
-    { prefix: "roadTile_028", suffix: " (1)" },
-    { prefix: "roadTile_029", suffix: " (1)" },
-    { prefix: "roadTile_030", suffix: "" },
-    { prefix: "roadTile_031", suffix: "" },
-    { prefix: "roadTile_032", suffix: "" },
-    { prefix: "roadTile_033", suffix: "" },
-    { prefix: "roadTile_034", suffix: "" },
-    { prefix: "roadTile_035", suffix: "" },
-    { prefix: "roadTile_036", suffix: "" },
-    { prefix: "roadTile_037", suffix: "" },
-    { prefix: "roadTile_038", suffix: "" },
-    { prefix: "roadTile_039", suffix: "" },
-    { prefix: "roadTile_040", suffix: "" },
-    { prefix: "roadTile_041", suffix: "" },
-    { prefix: "roadTile_042", suffix: "" },
-    { prefix: "roadTile_043", suffix: "" },
-    { prefix: "roadTile_044", suffix: "" },
-    { prefix: "roadTile_045", suffix: " (1)" },
-    { prefix: "roadTile_046", suffix: "" },
-    { prefix: "roadTile_047", suffix: "" },
-    { prefix: "roadTile_048", suffix: "" },
-    { prefix: "roadTile_049", suffix: "" },
-    { prefix: "roadTile_050", suffix: "" },
-    { prefix: "roadTile_051", suffix: "" },
-    { prefix: "roadTile_052", suffix: "" },
-    { prefix: "roadTile_053", suffix: "" },
-    { prefix: "roadTile_054", suffix: "" },
-    { prefix: "roadTile_055", suffix: "" },
-    { prefix: "roadTile_056", suffix: "" },
-    { prefix: "roadTile_057", suffix: "" },
-    { prefix: "roadTile_058", suffix: "" },
-    { prefix: "roadTile_059", suffix: "" },
-    { prefix: "roadTile_060", suffix: "" },
-    { prefix: "roadTile_061", suffix: "" },
-    { prefix: "roadTile_062", suffix: "" },
-    { prefix: "roadTile_063", suffix: "" },
-    { prefix: "roadTile_064", suffix: "" },
-    { prefix: "roadTile_065", suffix: "" },
-    { prefix: "roadTile_066", suffix: "" },
-    { prefix: "roadTile_067", suffix: "" },
-    { prefix: "roadTile_068", suffix: "" },
-    { prefix: "roadTile_069", suffix: "" },
-    { prefix: "roadTile_070", suffix: "" },
-    { prefix: "roadTile_071", suffix: "" },
-    { prefix: "roadTile_072", suffix: "" },
-    { prefix: "roadTile_073", suffix: "" },
-    { prefix: "roadTile_074", suffix: "" },
-    { prefix: "roadTile_075", suffix: "" },
-    { prefix: "roadTile_076", suffix: "" },
-    { prefix: "roadTile_077", suffix: "" },
-    { prefix: "roadTile_078", suffix: "" },
-    { prefix: "roadTile_079", suffix: "" },
-    { prefix: "roadTile_080", suffix: "" },
-    { prefix: "roadTile_081", suffix: "" },
-    { prefix: "roadTile_082", suffix: "" },
-    { prefix: "roadTile_083", suffix: "" },
-    { prefix: "roadTile_084", suffix: "" },
-    { prefix: "roadTile_085", suffix: "" },
-    { prefix: "roadTile_086", suffix: "" },
-    { prefix: "roadTile_087", suffix: "" },
-    { prefix: "roadTile_088", suffix: "" },
-    { prefix: "roadTile_089", suffix: "" },
-    { prefix: "roadTile_090", suffix: "" },
-    { prefix: "roadTile_091", suffix: "" },
-    { prefix: "roadTile_092", suffix: "" },
-    { prefix: "roadTile_093", suffix: "" },
-    { prefix: "roadTile_094", suffix: "" },
-    { prefix: "roadTile_095", suffix: "" },
-    { prefix: "roadTile_096", suffix: "" },
-    { prefix: "roadTile_097", suffix: "" },
-    { prefix: "roadTile_098", suffix: "" },
-    { prefix: "roadTile_099", suffix: "" },
-    { prefix: "roadTile_100", suffix: "" },
-    { prefix: "roadTile_101", suffix: "" },
-    { prefix: "roadTile_102", suffix: "" },
-    { prefix: "roadTile_103", suffix: "" },
-    { prefix: "roadTile_104", suffix: "" },
-    { prefix: "roadTile_105", suffix: "" },
-    { prefix: "roadTile_106", suffix: "" },
-    { prefix: "roadTile_107", suffix: "" },
-    { prefix: "roadTile_108", suffix: "" },
-    { prefix: "roadTile_109", suffix: "" },
-    { prefix: "roadTile_110", suffix: "" },
-    { prefix: "roadTile_111", suffix: "" },
-    { prefix: "roadTile_112", suffix: "" },
-    { prefix: "roadTile_113", suffix: "" },
-    { prefix: "roadTile_114", suffix: "" },
-    { prefix: "roadTile_115", suffix: "" },
-    { prefix: "roadTile_116", suffix: "" },
-    { prefix: "roadTile_117", suffix: "" },
-    { prefix: "roadTile_118", suffix: "" },
-    { prefix: "roadTile_119", suffix: "" },
-    { prefix: "roadTile_120", suffix: "" },
-    { prefix: "roadTile_121", suffix: "" },
-    { prefix: "roadTile_122", suffix: "" },
-    { prefix: "roadTile_123", suffix: "" },
-    { prefix: "roadTile_124", suffix: "" },
-    { prefix: "roadTile_125", suffix: "" },
-    { prefix: "roadTile_126", suffix: "" },
-    { prefix: "roadTile_127", suffix: "" },
-    { prefix: "roadTile_128", suffix: "" },
-    { prefix: "roadTile_129", suffix: "" },
-    { prefix: "roadTile_130", suffix: "" },
-    { prefix: "roadTile_131", suffix: "" },
-    { prefix: "roadTile_132", suffix: "" },
-    { prefix: "roadTile_133", suffix: "" },
-    { prefix: "roadTile_134", suffix: "" },
-    { prefix: "roadTile_135", suffix: "" },
-    { prefix: "roadTile_136", suffix: "" },
-    { prefix: "roadTile_137", suffix: "" },
-    { prefix: "roadTile_138", suffix: "" },
-    { prefix: "roadTile_139", suffix: "" },
-    { prefix: "roadTile_140", suffix: "" },
-    { prefix: "roadTile_141", suffix: "" },
-    { prefix: "roadTile_142", suffix: "" },
-    { prefix: "roadTile_143", suffix: "" },
-    { prefix: "roadTile_144", suffix: "" },
-    { prefix: "roadTile_145", suffix: "" },
-    { prefix: "roadTile_146", suffix: "" },
-    { prefix: "roadTile_147", suffix: "" },
-    { prefix: "roadTile_148", suffix: "" },
-    { prefix: "roadTile_149", suffix: "" },
-    { prefix: "roadTile_150", suffix: "" },
-    { prefix: "roadTile_151", suffix: "" },
-    { prefix: "roadTile_152", suffix: "" },
-    { prefix: "roadTile_153", suffix: "" },
-    { prefix: "roadTile_154", suffix: "" },
-    { prefix: "roadTile_155", suffix: "" },
-    { prefix: "roadTile_156", suffix: "" },
-    { prefix: "roadTile_157", suffix: "" },
-    { prefix: "roadTile_158", suffix: "" },
-    { prefix: "roadTile_159", suffix: "" },
-    { prefix: "roadTile_160", suffix: "" },
-    { prefix: "roadTile_161", suffix: "" },
-    { prefix: "roadTile_162", suffix: "" },
-    { prefix: "roadTile_163", suffix: "" },
-    { prefix: "roadTile_164", suffix: "" },
-    { prefix: "roadTile_165", suffix: "" },
-    { prefix: "roadTile_166", suffix: "" },
-    { prefix: "roadTile_167", suffix: "" },
-    { prefix: "roadTile_168", suffix: "" },
-    { prefix: "roadTile_169", suffix: "" },
-    { prefix: "roadTile_170", suffix: "" },
-    { prefix: "roadTile_171", suffix: "" },
-    { prefix: "roadTile_172", suffix: "" },
-    { prefix: "roadTile_173", suffix: "" },
-    { prefix: "roadTile_174", suffix: "" },
-    { prefix: "roadTile_175", suffix: "" },
-    { prefix: "roadTile_176", suffix: "" },
-    { prefix: "roadTile_177", suffix: "" },
-    { prefix: "roadTile_178", suffix: "" },
-    { prefix: "roadTile_179", suffix: "" },
-    { prefix: "roadTile_180", suffix: "" },
-    { prefix: "roadTile_181", suffix: "" },
-    { prefix: "roadTile_182", suffix: "" },
-    { prefix: "roadTile_183", suffix: "" },
-    { prefix: "roadTile_184", suffix: "" },
-    { prefix: "roadTile_185", suffix: "" },
-    { prefix: "roadTile_186", suffix: "" },
-    { prefix: "roadTile_187", suffix: "" },
-    { prefix: "roadTile_188", suffix: "" },
-    { prefix: "roadTile_189", suffix: "" },
-  ];
-  for (const t of tiles) {
-    paths.push(`/models/road tiles/${t.prefix}${t.suffix}.gltf`);
-  }
-  return paths;
-})();
-
-const TILE_SIZE = 3; // each tile is 3x3 units
-const GRID_COLS = Math.ceil((MAP_BOUNDARY * 2) / TILE_SIZE); // 10
-const GRID_ROWS = GRID_COLS;
-
 // ============================================================
-// Single road tile instance
-// ============================================================
-function RoadTile({ path, position }: { path: string; position: [number, number, number] }) {
-  const { scene } = useGLTF(path);
-  const clonedScene = useMemo(() => scene.clone(true), [scene]);
-  return <primitive object={clonedScene} position={position} rotation={[-Math.PI / 2, 0, 0]} />;
-}
-
-// ============================================================
-// Ground / Road tile ground
+// Ground — flat base floor at Y=0 + boundary walls
 // ============================================================
 function RoadTileGround() {
-  // Generate grid layout with random tile selection
-  const tiles = useMemo(() => {
-    const result: { path: string; position: [number, number, number] }[] = [];
-    const halfMap = MAP_BOUNDARY;
-    for (let row = 0; row < GRID_ROWS; row++) {
-      for (let col = 0; col < GRID_COLS; col++) {
-        const x = -halfMap + col * TILE_SIZE + TILE_SIZE / 2;
-        const z = -halfMap + row * TILE_SIZE + TILE_SIZE / 2;
-        const randomIndex = Math.floor(Math.random() * TILE_PATHS.length);
-        result.push({
-          path: TILE_PATHS[randomIndex],
-          position: [x, 0, z],
-        });
-      }
-    }
-    return result;
-  }, []);
-
   return (
     <RigidBody type="fixed" colliders={false}>
-      {tiles.map((tile, i) => (
-        <RoadTile key={i} path={tile.path} position={tile.position} />
-      ))}
-      {/* Ground collider */}
-      <CuboidCollider
-        position={[0, -0.5, 0]}
-        args={[MAP_BOUNDARY, 0.5, MAP_BOUNDARY]}
-      />
+      {/* Flat base ground at Y=0 */}
+      <mesh position={[0, -0.5, 0]} receiveShadow>
+        <boxGeometry args={[MAP_BOUNDARY * 2, 1, MAP_BOUNDARY * 2]} />
+        <meshStandardMaterial color="#a3e635" roughness={0.8} metalness={0} />
+      </mesh>
+      <CuboidCollider position={[0, -0.5, 0]} args={[MAP_BOUNDARY, 0.5, MAP_BOUNDARY]} />
       {/* Boundary walls */}
       <CuboidCollider position={[0, 2, -MAP_BOUNDARY]} args={[MAP_BOUNDARY, 4, 0.5]} />
       <CuboidCollider position={[0, 2, MAP_BOUNDARY]} args={[MAP_BOUNDARY, 4, 0.5]} />
@@ -407,12 +166,10 @@ function RoadTileGround() {
 function Tree({ position, scale = 1 }: { position: [number, number, number]; scale?: number }) {
   return (
     <group position={position} scale={scale}>
-      {/* Trunk */}
       <mesh position={[0, 0.5, 0]} castShadow>
         <cylinderGeometry args={[0.15, 0.2, 1, 8]} />
         <meshStandardMaterial color="#92400e" roughness={0.7} metalness={0.1} />
       </mesh>
-      {/* Foliage layers */}
       <mesh position={[0, 1.2, 0]} castShadow>
         <sphereGeometry args={[0.6, 8, 8]} />
         <meshStandardMaterial color="#22c55e" roughness={0.6} metalness={0.1} />
@@ -507,33 +264,21 @@ function Bridge({
 }
 
 // ============================================================
-// Character (run2.glb model)
+// Player — simple sphere (no run2.glb model)
 // ============================================================
-function Character({
+function Player({
   posRef,
   frozen,
 }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
   frozen: boolean;
 }) {
-  const { scene, animations } = useGLTF("/models/run2.glb");
-  const { actions } = useAnimations(animations);
-  const clonedScene = useMemo(() => scene.clone(true), [scene]);
   const rigidBodyRef = useRef<RapierRigidBody>(null);
-  const characterRef = useRef<THREE.Group>(null);
+  const playerRef = useRef<THREE.Mesh>(null);
   const keysRef = useRef<Record<string, boolean>>({});
   const cameraTarget = useRef(new THREE.Vector3());
   const { camera } = useThree();
 
-  // Auto-play animation
-  useEffect(() => {
-    const action = actions?.[Object.keys(actions ?? {})[0]];
-    if (action) {
-      action.reset().play();
-    }
-  }, [actions]);
-
-  // Keyboard listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (frozen) return;
@@ -551,15 +296,13 @@ function Character({
     };
   }, [frozen]);
 
-  // Movement and camera
-  useFrame((_, delta) => {
-    if (!rigidBodyRef.current || !characterRef.current) return;
+  useFrame(() => {
+    if (!rigidBodyRef.current || !playerRef.current) return;
 
     const keys = keysRef.current;
     const body = rigidBodyRef.current;
     const pos = body.translation();
 
-    // Movement direction
     const moveDir = new THREE.Vector3();
     if (keys["KeyW"] || keys["ArrowUp"]) moveDir.z -= 1;
     if (keys["KeyS"] || keys["ArrowDown"]) moveDir.z += 1;
@@ -580,21 +323,11 @@ function Character({
         },
         true,
       );
-
-      // Rotate character to face movement direction
-      const targetAngle = Math.atan2(moveDir.x, moveDir.z);
-      let currentAngle = characterRef.current.rotation.y;
-      let diff = targetAngle - currentAngle;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      characterRef.current.rotation.y += diff * 0.1;
     } else {
-      // Slow down
       const vel = body.linvel();
       body.setLinvel({ x: vel.x * 0.85, y: vel.y, z: vel.z * 0.85 }, true);
     }
 
-    // Jump
     if (keys["Space"]) {
       const vel = body.linvel();
       if (Math.abs(vel.y) < 0.1) {
@@ -602,10 +335,8 @@ function Character({
       }
     }
 
-    // Update position ref for coin collection
     posRef.current.set(pos.x, pos.y, pos.z);
 
-    // Third-person camera follow
     const camOffset = new THREE.Vector3(0, 4, 6);
     const targetPos = new THREE.Vector3(pos.x, pos.y + 1.5, pos.z);
     cameraTarget.current.lerp(targetPos, 0.05);
@@ -617,17 +348,29 @@ function Character({
   return (
     <RigidBody
       ref={rigidBodyRef}
-      position={[0, 1, 0]}
+      position={[0, 2, 0]}
+      type="dynamic"
       colliders={false}
       enabledRotations={[false, false, false]}
       mass={1}
       friction={0.5}
+      canSleep={false}
     >
-      <group ref={characterRef} scale={0.8}>
-        <primitive object={clonedScene} />
-      </group>
-      <CuboidCollider args={[0.3, 0.8, 0.3]} position={[0, 0.8, 0]} />
-      {/* Origin marker - small glowing ball at feet */}
+      <mesh ref={playerRef} castShadow>
+        <sphereGeometry args={[0.4, 16, 16]} />
+        <meshStandardMaterial
+          color="#3b82f6"
+          roughness={0.3}
+          metalness={0.4}
+          emissive="#3b82f6"
+          emissiveIntensity={0.1}
+        />
+      </mesh>
+      <mesh position={[0, 0.05, 0]}>
+        <ringGeometry args={[0.3, 0.5, 16]} />
+        <meshBasicMaterial color="#60a5fa" transparent opacity={0.4} side={THREE.DoubleSide} />
+      </mesh>
+      <BallCollider args={[0.4]} position={[0, 0, 0]} />
       <mesh position={[0, 0.05, 0]}>
         <sphereGeometry args={[0.08, 16, 16]} />
         <meshBasicMaterial color="#fbbf24" />
@@ -689,7 +432,6 @@ function SceneContent({
 }) {
   return (
     <>
-      {/* Lighting - bright noon outdoor */}
       <ambientLight intensity={0.5} />
       <directionalLight
         position={[10, 15, 10]}
@@ -699,53 +441,11 @@ function SceneContent({
         shadow-mapSize-height={2048}
       />
       <directionalLight position={[-5, 10, -5]} intensity={0.3} />
-      <hemisphereLight
-        args={["#87ceeb", "#90ee90", 0.6]}
-      />
+      <hemisphereLight args={["#87ceeb", "#90ee90", 0.6]} />
 
-      {/* Ground */}
+      {/* Core assets: ground + coins + player — loaded immediately */}
       <RoadTileGround />
 
-      {/* Decorative trees around edges */}
-      {[
-        [-12, 0, -12],
-        [-12, 0, 12],
-        [12, 0, -12],
-        [12, 0, 12],
-        [-10, 0, -14],
-        [10, 0, -14],
-        [-14, 0, 10],
-        [14, 0, -10],
-        [-14, 0, -8],
-        [14, 0, 8],
-      ].map((pos, i) => (
-        <Tree key={`tree-${i}`} position={pos as [number, number, number]} scale={0.8 + Math.random() * 0.4} />
-      ))}
-
-      {/* Platforms */}
-      <Platform position={[-5, 0.5, -5]} size={[2, 1, 2]} color="#fbbf24" />
-      <Platform position={[5, 0.5, -5]} size={[2, 1, 2]} color="#f87171" />
-      <Platform position={[-5, 0.5, 5]} size={[2, 1, 2]} color="#60a5fa" />
-      <Platform position={[5, 0.5, 5]} size={[2, 1, 2]} color="#a78bfa" />
-      <Platform position={[0, 1, 0]} size={[3, 0.5, 3]} color="#34d399" />
-      <Platform position={[-8, 1.5, 0]} size={[1.5, 0.5, 1.5]} color="#f472b6" />
-      <Platform position={[8, 1.5, 0]} size={[1.5, 0.5, 1.5]} color="#f472b6" />
-      <Platform position={[0, 2, -8]} size={[2, 0.5, 2]} color="#fb923c" />
-      <Platform position={[0, 2, 8]} size={[2, 0.5, 2]} color="#fb923c" />
-
-      {/* Bridges */}
-      <Bridge
-        start={[-5, 0.5, -5]}
-        end={[5, 0.5, -5]}
-        color="#f87171"
-      />
-      <Bridge
-        start={[-5, 0.5, 5]}
-        end={[5, 0.5, 5]}
-        color="#60a5fa"
-      />
-
-      {/* Coins */}
       {coins.map((coin) => (
         <CoinCollider key={coin.id} coin={coin} onCollect={onCollectCoin} collectedSet={collectedSet} />
       ))}
@@ -753,20 +453,16 @@ function SceneContent({
         <Coin key={`vis-${coin.id}`} position={coin.position} collected={coin.collected} />
       ))}
 
-      {/* Character */}
-      <Suspense fallback={null}>
-        <Character posRef={posRef} frozen={frozen} />
-      </Suspense>
+      <Player posRef={posRef} frozen={frozen} />
     </>
   );
 }
 
 // ============================================================
-// Generate random coin positions
+// Generate coin positions
 // ============================================================
 function generateCoins(count: number): CoinData[] {
   const positions: [number, number, number][] = [
-    // On ground
     [-3, 0.2, -3],
     [3, 0.2, -3],
     [-3, 0.2, 3],
@@ -777,7 +473,6 @@ function generateCoins(count: number): CoinData[] {
     [7, 0.2, -2],
     [-7, 0.2, 2],
     [7, 0.2, 2],
-    // On platforms
     [-5, 1.2, -5],
     [5, 1.2, -5],
     [-5, 1.2, 5],
@@ -787,11 +482,9 @@ function generateCoins(count: number): CoinData[] {
     [8, 2.2, 0],
     [0, 2.7, -8],
     [0, 2.7, 8],
-    // Extra
     [-10, 0.2, -6],
   ];
 
-  // Fill remaining with random positions
   while (positions.length < count) {
     const x = (Math.random() - 0.5) * 26;
     const z = (Math.random() - 0.5) * 26;
@@ -860,12 +553,71 @@ function CoordinateOverlay({ posRef }: { posRef: React.MutableRefObject<THREE.Ve
 }
 
 // ============================================================
+// Decorative elements data (trees, platforms, bridges)
+// ============================================================
+const DECORATIVE_TREES: [number, number, number][] = [
+  [-12, 0, -12],
+  [-12, 0, 12],
+  [12, 0, -12],
+  [12, 0, 12],
+  [-10, 0, -14],
+  [10, 0, -14],
+  [-14, 0, 10],
+  [14, 0, -10],
+  [-14, 0, -8],
+  [14, 0, 8],
+];
+
+const DECORATIVE_PLATFORMS: { position: [number, number, number]; size: [number, number, number]; color: string }[] = [
+  { position: [-5, 0.5, -5], size: [2, 1, 2], color: "#fbbf24" },
+  { position: [5, 0.5, -5], size: [2, 1, 2], color: "#f87171" },
+  { position: [-5, 0.5, 5], size: [2, 1, 2], color: "#60a5fa" },
+  { position: [5, 0.5, 5], size: [2, 1, 2], color: "#a78bfa" },
+  // Central raised platform removed — flattened to ground level
+  // { position: [0, 1, 0], size: [3, 0.5, 3], color: "#34d399" },
+  { position: [-8, 1.5, 0], size: [1.5, 0.5, 1.5], color: "#f472b6" },
+  { position: [8, 1.5, 0], size: [1.5, 0.5, 1.5], color: "#f472b6" },
+  { position: [0, 2, -8], size: [2, 0.5, 2], color: "#fb923c" },
+  { position: [0, 2, 8], size: [2, 0.5, 2], color: "#fb923c" },
+];
+
+const DECORATIVE_BRIDGES: { start: [number, number, number]; end: [number, number, number]; color: string }[] = [
+  { start: [-5, 0.5, -5], end: [5, 0.5, -5], color: "#f87171" },
+  { start: [-5, 0.5, 5], end: [5, 0.5, 5], color: "#60a5fa" },
+];
+
+// ============================================================
+// Decorative elements renderer (batched)
+// ============================================================
+function DecorativeElements({ visibleCount }: { visibleCount: number }) {
+  const treeCount = Math.min(visibleCount, DECORATIVE_TREES.length);
+  const platformCount = Math.min(Math.max(0, visibleCount - DECORATIVE_TREES.length), DECORATIVE_PLATFORMS.length);
+  const bridgeCount = Math.min(Math.max(0, visibleCount - DECORATIVE_TREES.length - DECORATIVE_PLATFORMS.length), DECORATIVE_BRIDGES.length);
+
+  return (
+    <>
+      {DECORATIVE_TREES.slice(0, treeCount).map((pos, i) => (
+        <Tree key={`tree-${i}`} position={pos} scale={0.8 + Math.random() * 0.4} />
+      ))}
+      {DECORATIVE_PLATFORMS.slice(0, platformCount).map((p, i) => (
+        <Platform key={`plat-${i}`} position={p.position} size={p.size} color={p.color} />
+      ))}
+      {DECORATIVE_BRIDGES.slice(0, bridgeCount).map((b, i) => (
+        <Bridge key={`bridge-${i}`} start={b.start} end={b.end} color={b.color} />
+      ))}
+    </>
+  );
+}
+
+// ============================================================
 // Main GameScene component
 // ============================================================
 export default function GameScene() {
   const [coins, setCoins] = useState<CoinData[]>([]);
   const [frozen, setFrozen] = useState(false);
   const [won, setWon] = useState(false);
+  const [coreReady, setCoreReady] = useState(false);
+  const [decorativeCount, setDecorativeCount] = useState(0);
   const posRef = useRef(new THREE.Vector3(0, 0, 0));
   const initialized = useRef(false);
   const collectedSet = useRef(new Set<number>());
@@ -878,6 +630,34 @@ export default function GameScene() {
     }
   }, []);
 
+  // Mark core assets as ready once coins are generated
+  useEffect(() => {
+    if (coins.length > 0 && !coreReady) {
+      // Small delay to let the first render pass complete
+      const t = setTimeout(() => setCoreReady(true), 100);
+      return () => clearTimeout(t);
+    }
+  }, [coins, coreReady]);
+
+  // Batch-load decorative elements: every 300ms add 3-5 items
+  useEffect(() => {
+    if (!coreReady) return;
+
+    const totalDecorative =
+      DECORATIVE_TREES.length + DECORATIVE_PLATFORMS.length + DECORATIVE_BRIDGES.length;
+
+    if (decorativeCount >= totalDecorative) return;
+
+    const interval = setInterval(() => {
+      setDecorativeCount((prev) => {
+        const next = prev + (3 + Math.floor(Math.random() * 3)); // 3-5 per batch
+        return Math.min(next, totalDecorative);
+      });
+    }, 300);
+
+    return () => clearInterval(interval);
+  }, [coreReady, decorativeCount]);
+
   const remaining = coins.filter((c) => !c.collected).length;
 
   const handleCollectCoin = useCallback(
@@ -885,15 +665,16 @@ export default function GameScene() {
       if (frozen) return;
 
       setCoins((prev) => {
+        const coin = prev.find((c) => c.id === id);
+        if (!coin || coin.collected) return prev;
+
         const updated = prev.map((c) =>
           c.id === id ? { ...c, collected: true } : c
         );
         const newRemaining = updated.filter((c) => !c.collected).length;
 
-        // Play bell sound on coin collection
         playBellSound();
 
-        // Check win condition
         if (newRemaining === 0) {
           setTimeout(() => {
             setFrozen(true);
@@ -923,10 +704,11 @@ export default function GameScene() {
             onCollectCoin={handleCollectCoin}
             collectedSet={collectedSet}
           />
+          <DecorativeElements visibleCount={decorativeCount} />
         </Physics>
       </Canvas>
 
-      <LoadingOverlay />
+      <LoadingOverlay visible={!coreReady} />
       <CoinCounter remaining={remaining} />
       <CoordinateOverlay posRef={posRef} />
       {won && <WinOverlay />}

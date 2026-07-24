@@ -3,9 +3,8 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
-import { GizmoHelper, GizmoViewport, useProgress, useTexture } from "@react-three/drei";
+import { GizmoHelper, GizmoViewport, useTexture } from "@react-three/drei";
 import { useBottomPanelStore } from "@/store/useBottomPanelStore";
-import Character3D, { type CharacterPos } from "@/components/Character3D";
 import HintBox from "@/components/ui/HintBox";
 import AxisMatchingPanel, { isAxisMatchingComplete } from "./components/AxisMatchingPanel";
 import PositionVectorPanel from "./components/PositionVectorPanel";
@@ -15,16 +14,24 @@ import GameScene from "./components/GameScene";
 import { INITIAL_Q_POSITION, type AxisChoice, type LessonStep, type Vec3Position } from "./components/types";
 
 function LoadingOverlay() {
-  const { active, progress } = useProgress();
-  if (!active) return null;
+  const [show, setShow] = useState(true);
+
+  useEffect(() => {
+    // Force-hide loading overlay after 3 seconds as a deadlock fallback
+    const timer = setTimeout(() => setShow(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!show) return null;
+
   return (
     <div className="absolute inset-0 z-[6] flex items-center justify-center bg-gray-50/60 text-sm text-gray-400">
-      Loading model... {progress.toFixed(0)}%
+      Loading model...
     </div>
   );
 }
 
-function CoordinateOverlay({ posRef }: { posRef: { current: CharacterPos } }) {
+function CoordinateOverlay({ posRef }: { posRef: { current: THREE.Vector3 } }) {
   const textRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -71,7 +78,7 @@ function Skybox() {
 }
 
 function PositionScene() {
-  const posRef = useRef<CharacterPos>({ x: 0, y: 0, z: 0 });
+  const posRef = useRef(new THREE.Vector3(0, 0, 0));
 
   return (
     <div className="relative h-full w-full">
@@ -80,7 +87,11 @@ function PositionScene() {
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 10, 5]} intensity={1} />
         <Suspense fallback={null}>
-          <Character3D posRef={posRef} />
+          {/* Default reference point - a small glowing sphere at origin */}
+          <mesh position={[0, 0, 0]}>
+            <sphereGeometry args={[0.15, 16, 16]} />
+            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.3} />
+          </mesh>
         </Suspense>
         <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
           <GizmoViewport
@@ -229,7 +240,7 @@ export default function PositionPage() {
     }
 
     setBottomPanel({
-      hint: "Collect all 20 coins to win! WASD to move, Shift to sprint, Space to jump.",
+      hint: "Collect all 8 coins to win! WASD to move, Shift to sprint, Space to jump.",
       checkDisabled: false,
       checkLabel: "Previous",
       onCheck: () => goToPage(3),
