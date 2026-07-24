@@ -1,8 +1,9 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { Canvas } from "@react-three/fiber";
-import { GizmoHelper, GizmoViewport, useProgress } from "@react-three/drei";
+import * as THREE from "three";
+import { Canvas, useThree } from "@react-three/fiber";
+import { GizmoHelper, GizmoViewport, useProgress, useTexture } from "@react-three/drei";
 import { useBottomPanelStore } from "@/store/useBottomPanelStore";
 import Character3D, { type CharacterPos } from "@/components/Character3D";
 import HintBox from "@/components/ui/HintBox";
@@ -10,6 +11,7 @@ import AxisMatchingPanel, { isAxisMatchingComplete } from "./components/AxisMatc
 import PositionVectorPanel from "./components/PositionVectorPanel";
 import ReferenceFrameQuiz from "./components/ReferenceFrameQuiz";
 import TeachingScene from "./components/TeachingScene";
+import GameScene from "./components/GameScene";
 import { INITIAL_Q_POSITION, type AxisChoice, type LessonStep, type Vec3Position } from "./components/types";
 
 function LoadingOverlay() {
@@ -47,12 +49,34 @@ function CoordinateOverlay({ posRef }: { posRef: { current: CharacterPos } }) {
   );
 }
 
+// ============================================================
+// Skybox (equirectangular panorama)
+// ============================================================
+function Skybox() {
+  const texture = useTexture("/skyboxes/skybox-morning.png");
+  const { scene } = useThree();
+
+  useEffect(() => {
+    const prev = scene.background;
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    scene.background = texture;
+    scene.environment = texture;
+    return () => {
+      scene.background = prev;
+      scene.environment = null;
+    };
+  }, [texture, scene]);
+
+  return null;
+}
+
 function PositionScene() {
   const posRef = useRef<CharacterPos>({ x: 0, y: 0, z: 0 });
 
   return (
     <div className="relative h-full w-full">
       <Canvas camera={{ position: [0, 5, 10], fov: 45 }} gl={{ antialias: true }}>
+        <Skybox />
         <ambientLight intensity={0.6} />
         <directionalLight position={[5, 10, 5]} intensity={1} />
         <Suspense fallback={null}>
@@ -205,7 +229,7 @@ export default function PositionPage() {
     }
 
     setBottomPanel({
-      hint: "Use the keyboard controls and watch the live X, Y, Z position values.",
+      hint: "Collect all 20 coins to win! WASD to move, Shift to sprint, Space to jump.",
       checkDisabled: false,
       checkLabel: "Previous",
       onCheck: () => goToPage(3),
@@ -218,7 +242,7 @@ export default function PositionPage() {
   useEffect(() => resetBottomPanel, [resetBottomPanel]);
 
   if (page === 4) {
-    return <PositionScene />;
+    return <GameScene />;
   }
 
   return (
