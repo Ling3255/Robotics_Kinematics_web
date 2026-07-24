@@ -248,8 +248,9 @@ function ArmModel({ anglesRef, onReady }: {
           return clone;
         });
       } else {
-        mesh.material = (mesh.material as THREE.MeshStandardMaterial).clone();
-        mesh.material.color.set(c);
+        const clone = (mesh.material as THREE.MeshStandardMaterial).clone();
+        clone.color.set(c);
+        mesh.material = clone;
       }
     });
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useBottomPanelStore } from "@/store/useBottomPanelStore";
 import AssemblyPage from "@/components/pages/AssemblyPage";
 import FbxViewer from "./FbxViewer";
+import RoboViewer from "./RoboViewer";
 
 export default function RobotBasicsLesson() {
   const [page, setPage] = useState(1);
@@ -28,7 +29,7 @@ export default function RobotBasicsLesson() {
 
     if (page === 2) {
       setBottomPanel({
-        hint: "Click Next to view the character and robotic arm demonstration.",
+        hint: "The base is fixed. Adjust the joint angle sliders to move the arm — same as Forward Kinematics.",
         checkDisabled: false,
         checkLabel: "Previous",
         onCheck: () => setPage(1),
@@ -58,7 +59,7 @@ export default function RobotBasicsLesson() {
   }
 
   if (page === 2) {
-    return <div className="h-full w-full bg-slate-50" />;
+    return <RoboViewer />;
   }
 
   return <FbxViewer />;

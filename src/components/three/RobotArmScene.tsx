@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
-import { Gltf, OrbitControls, Bounds } from "@react-three/drei";
+import { Suspense, useEffect } from "react";
+import { useGLTF, OrbitControls, Bounds } from "@react-three/drei";
 import * as THREE from "three";
 
 // ============================================================
@@ -34,25 +34,28 @@ function BlenderAxes({ length = 3 }: { length?: number }) {
 // Auto-centered model
 // ============================================================
 function Model() {
+  const gltf = useGLTF("/models/robot-arm.glb");
+
+  useEffect(() => {
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const c = box.getCenter(new THREE.Vector3());
+    const s = box.getSize(new THREE.Vector3());
+    console.log(
+      `[RobotArm] Loaded | center: (${c.x.toFixed(2)}, ${c.y.toFixed(2)}, ${c.z.toFixed(2)}) | ` +
+      `size: (${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`
+    );
+    // Center model on ground
+    gltf.scene.position.set(-c.x, -box.min.y, -c.z);
+  }, [gltf.scene]);
+
   return (
     <Bounds fit clip observe margin={1.5}>
-      <Gltf
-        src="/models/robot-arm.glb"
-        onLoad={(gltf) => {
-          const box = new THREE.Box3().setFromObject(gltf.scene);
-          const c = box.getCenter(new THREE.Vector3());
-          const s = box.getSize(new THREE.Vector3());
-          console.log(
-            `[RobotArm] Loaded | center: (${c.x.toFixed(2)}, ${c.y.toFixed(2)}, ${c.z.toFixed(2)}) | ` +
-            `size: (${s.x.toFixed(2)}, ${s.y.toFixed(2)}, ${s.z.toFixed(2)})`
-          );
-          // Center model on ground
-          gltf.scene.position.set(-c.x, -box.min.y, -c.z);
-        }}
-      />
+      <primitive object={gltf.scene} />
     </Bounds>
   );
 }
+
+useGLTF.preload("/models/robot-arm.glb");
 
 // ============================================================
 // Scene
