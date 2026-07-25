@@ -40,7 +40,7 @@ export default function OrientationLesson() {
     }
 
     setBottomPanel({
-      hint: "Explore the rotation matrix freely. Drag the sphere to see how orientation maps to matrix values.",
+      hint: "Each column of ᵁ_B R is one of the body frame's axes seen from the fixed frame U — watch them change as the slowed-down character flips.",
       checkDisabled: false,
       checkLabel: "Previous",
       onCheck: () => setPage(1),

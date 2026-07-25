@@ -19,17 +19,56 @@ export default function PositionVectorPanel({ qPosition, completed, onPreset }: 
         </p>
       </div>
 
-      <div className="rounded-2xl bg-slate-950 p-4 font-mono text-sm text-white">
-        <p className="text-slate-300">U = (0, 0, 0)</p>
-        <p className="mt-3 text-lg font-bold">
-          <sup>U</sup>Q = [{formatComponent(qPosition.qx)}, {formatComponent(qPosition.qy)}, {formatComponent(qPosition.qz)}]<sup>T</sup>
-        </p>
-      </div>
+      {/* Position equation with live values — one merged card */}
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Position Equation
+          </p>
+          <p className="font-mono text-[11px] text-slate-400">U = (0, 0, 0)</p>
+        </div>
 
-      <div className="grid gap-2 text-sm font-semibold">
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-red-600">X component: {formatComponent(qPosition.qx)}</p>
-        <p className="rounded-lg bg-slate-100 px-3 py-2 text-slate-700">Y component: {formatComponent(qPosition.qy)}</p>
-        <p className="rounded-lg bg-blue-50 px-3 py-2 text-blue-600">Z component: {formatComponent(qPosition.qz)}</p>
+        {/* ᵁQ̄ = [qx qy qz]ᵀ column matrix — values update live as Q moves */}
+        <div className="mt-3 flex items-center justify-center gap-3 text-slate-900">
+          <span className="text-xl font-semibold italic">
+            <sup className="mr-0.5 text-xs not-italic text-slate-500">U</sup>
+            <span className="overline">Q</span>
+            <span className="ml-2 not-italic">=</span>
+          </span>
+          <span className="flex items-stretch">
+            <span className="w-[10px] self-stretch rounded-l-sm border-y-2 border-l-2 border-slate-800" />
+            <span className="flex flex-col gap-1.5 px-3 py-1.5 text-base font-semibold">
+              {([
+                { axis: "x", value: qPosition.qx, color: "text-red-600" },
+                { axis: "y", value: qPosition.qy, color: "text-slate-700" },
+                { axis: "z", value: qPosition.qz, color: "text-blue-600" },
+              ] as const).map(({ axis, value, color }) => (
+                <span key={axis} className="flex items-baseline justify-between gap-3">
+                  <span className="italic">q<sub className="text-xs not-italic">{axis}</sub></span>
+                  <span className={`font-mono text-sm tabular-nums ${color}`}>{formatComponent(value)}</span>
+                </span>
+              ))}
+            </span>
+            <span className="w-[10px] self-stretch rounded-r-sm border-y-2 border-r-2 border-slate-800" />
+          </span>
+          <span className="text-xs font-medium text-slate-400">3 × 1 matrix</span>
+        </div>
+
+        {/* Symbol explanation */}
+        <dl className="mt-4 space-y-1.5 text-xs leading-5 text-slate-500">
+          <div className="flex gap-2">
+            <dt className="shrink-0 font-bold text-slate-700">U</dt>
+            <dd>The fixed reference frame — the robotic base (the corner of the room). It cannot move.</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="shrink-0 font-bold text-slate-700">Q</dt>
+            <dd>The movable object (the ball), initially at U and moved to a new position.</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="shrink-0 font-bold text-slate-700">q<sub>x</sub> q<sub>y</sub> q<sub>z</sub></dt>
+            <dd>Distances from U to Q measured along the X (red), Y (black) and Z (blue) axes.</dd>
+          </div>
+        </dl>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
