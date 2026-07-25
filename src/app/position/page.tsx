@@ -257,7 +257,7 @@ export default function PositionPage() {
   }
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1">
+    <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1 lg:h-[calc(100vh-112px)]">
       <TeachingScene
         step={page}
         qPosition={qPosition}
