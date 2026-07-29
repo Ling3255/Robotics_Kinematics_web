@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import BottomPanel from "@/components/layout/BottomPanel";
+import { useBottomPanelStore } from "@/store/useBottomPanelStore";
 import HintBox from "@/components/ui/HintBox";
+import TwoLink2DArm from "./TwoLink2DArm";
 import { CFG } from "@/components/three/ForwardKinematicsScene";
 
 const ThreeCanvasWrapper = dynamic(
@@ -23,21 +24,25 @@ const SLIDERS = [
   { label: "θ₄  Wrist Twist", key: "theta4", min: CFG.angleMin[4], max: CFG.angleMax[4], def: CFG.angleDefault[4] },
 ];
 
-function AngleSlider({ label, value, min, max, onChange }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void;
+function AngleSlider({ label, value, min, max, onChange, highlight }: {
+  label: string; value: number; min: number; max: number; onChange: (v: number) => void; highlight?: boolean;
 }) {
   return (
     <div className="mb-4">
       <div className="flex justify-between text-xs mb-1.5">
-        <span className="text-slate-600 font-medium">{label}</span>
-        <span className="text-slate-800 font-bold tabular-nums">{value.toFixed(1)}°</span>
+        <span className={`font-medium transition-colors ${highlight ? "text-amber-600" : "text-slate-600"}`}>{label}</span>
+        <span className={`font-bold tabular-nums transition-colors ${highlight ? "text-amber-600" : "text-slate-800"}`}>{value.toFixed(1)}°</span>
       </div>
       <input type="range" min={min} max={max} step={0.5} value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-full h-1.5 rounded-full appearance-none bg-slate-200 outline-none cursor-pointer
+        className={`w-full h-1.5 rounded-full appearance-none outline-none cursor-pointer transition-colors
+          ${highlight
+            ? "bg-amber-200 [&::-webkit-slider-thumb]:bg-amber-500"
+            : "bg-slate-200 [&::-webkit-slider-thumb]:bg-blue-600"
+          }
           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600 [&::-webkit-slider-thumb]:cursor-pointer
-          [&::-webkit-slider-thumb]:shadow-md" />
+          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
+          [&::-webkit-slider-thumb]:shadow-md`} />
       <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
         <span>{min}°</span><span>{max}°</span>
       </div>
@@ -45,7 +50,8 @@ function AngleSlider({ label, value, min, max, onChange }: {
   );
 }
 
-export default function ForwardKinematicsPage() {
+/** ----- Step 2: 3D Advanced Demo (preserving original 5-axis arm) ----- */
+function Advanced3DDemo() {
   const [theta0, setTheta0] = useState(CFG.angleDefault[0]);
   const [theta1, setTheta1] = useState(CFG.angleDefault[1]);
   const [theta2, setTheta2] = useState(CFG.angleDefault[2]);
@@ -58,7 +64,6 @@ export default function ForwardKinematicsPage() {
   const toggle2D = useCallback(() => {
     setMode2D(prev => {
       const next = !prev;
-      console.log("[Page] 2D Mode:", next, "cameraMode:", next ? "side" : "3d");
       if (next) { setTheta0(0); setTheta4(0); }
       return next;
     });
@@ -73,17 +78,17 @@ export default function ForwardKinematicsPage() {
   }, []);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-112px)]">
+    <div className="flex flex-col h-full">
       {/* ===== Header ===== */}
-      <div className="flex items-center gap-3 px-8 pt-5 pb-3">
-        <span className="px-4 py-2 text-[13px] font-medium rounded-lg bg-slate-800 text-white">
-          Forward Kinematics
+      <div className="flex items-center gap-3 px-8 pt-3 pb-3">
+        <span className="px-4 py-2 text-[13px] font-medium rounded-lg bg-purple-700 text-white">
+          Forward Kinematics — Advanced 3D
         </span>
         <span className="flex-1" />
         <button onClick={toggle2D}
           className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer
             ${mode2D ? "bg-amber-500 border-amber-400 text-white" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
-          {mode2D ? "2D Mode ON" : "2D Mode"}
+          {mode2D ? "2D View ON" : "2D View"}
         </button>
         <button onClick={handleReset}
           className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer">
@@ -163,12 +168,84 @@ export default function ForwardKinematicsPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <BottomPanel
-        hint="Drag to rotate · Scroll to zoom · Right-drag to pan. Adjust joint angles θ₁, θ₂, θ₃ to observe how the end-effector position changes."
-        checkDisabled={true}
-        nextDisabled={false}
-      />
+/** ----- Main Forward Kinematics Page with step-based navigation ----- */
+export default function ForwardKinematicsPage() {
+  const [step, setStep] = useState(1);
+  const setBottomPanel = useBottomPanelStore((state) => state.setConfig);
+  const resetBottomPanel = useBottomPanelStore((state) => state.resetConfig);
+
+  useEffect(() => {
+    const resetLesson = () => setStep(1);
+
+    if (step === 1) {
+      setBottomPanel({
+        hint: "🟢 Teaching Mode: Explore the 2-link planar arm. Adjust θ₁, θ₂ sliders and a₁, a₂ lengths. Watch the formulas highlight in real-time!",
+        checkDisabled: true,
+        checkLabel: "Previous",
+        nextDisabled: false,
+        resetDisabled: false,
+        onReset: resetLesson,
+        onNext: () => setStep(2),
+      });
+      return;
+    }
+
+    if (step === 2) {
+      setBottomPanel({
+        hint: "🟣 Advanced Mode: Explore a full 5-axis 3D robotic arm. Drag to rotate, scroll to zoom. Compare with the 2-link arm from the Teaching step.",
+        checkDisabled: false,
+        checkLabel: "Back to Teaching",
+        onCheck: () => setStep(1),
+        nextDisabled: true,
+        resetDisabled: false,
+        onReset: resetLesson,
+      });
+      return;
+    }
+  }, [step, setBottomPanel]);
+
+  useEffect(() => resetBottomPanel, [resetBottomPanel]);
+
+  // ---- Step indicators at top ----
+  const StepIndicator = () => (
+    <div className="flex items-center gap-2 px-8 pt-2 pb-0">
+      <button
+        onClick={() => setStep(1)}
+        className={`px-4 py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+          step === 1
+            ? "bg-emerald-600 border-emerald-500 text-white shadow-sm"
+            : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+        }`}
+      >
+        📐 Step 1: 2-Link Teaching
+      </button>
+      <button
+        onClick={() => setStep(2)}
+        className={`px-4 py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+          step === 2
+            ? "bg-purple-700 border-purple-600 text-white shadow-sm"
+            : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+        }`}
+      >
+        🦾 Step 2: 3D Advanced
+      </button>
+      <span className="flex-1" />
+      <span className="text-[11px] text-slate-400">
+        Mission 5: Forward Kinematics
+      </span>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-112px)]">
+      <StepIndicator />
+      <div className="flex-1 min-h-0">
+        {step === 1 ? <TwoLink2DArm /> : <Advanced3DDemo />}
+      </div>
     </div>
   );
 }
