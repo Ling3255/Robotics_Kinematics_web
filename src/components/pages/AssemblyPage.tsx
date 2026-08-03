@@ -21,7 +21,8 @@ useGLTF.preload("/models/assemble.glb");
 const S = { mx: 0, my: 0, part: null as string | null, snap: false };
 const CACHE = { g: new Map<string, THREE.BufferGeometry>(), q: new Map<string, THREE.Quaternion>(), s: new Map<string, THREE.Vector3>(), c: new Map<string, THREE.Color>() };
 
-function Scene({ placed, onPlace }: { placed: Set<string>; onPlace: React.MutableRefObject<((n: string) => void) | null> }) {
+function Scene({ placed, onPlace, onWrongOrder }: { placed: Set<string>; onPlace: React.MutableRefObject<((n: string) => void) | null>; onWrongOrder: React.MutableRefObject<(() => void) | null> }) {
+
   const gltf = useGLTF("/models/assemble.glb");
   const { scene, camera } = useThree();
   const rc = useRef(new THREE.Raycaster());
@@ -67,12 +68,17 @@ function Scene({ placed, onPlace }: { placed: Set<string>; onPlace: React.Mutabl
 
     // 松手 → 先检查放置（必须在更新 last.current 之前）
     if (!S.part && last.current) {
-      if (S.snap && last.current === ORDER.find(n => !placed.has(n))) {
+      const next = ORDER.find(n => !placed.has(n));
+      if (S.snap && last.current === next) {
         onPlace.current?.(last.current);
+      } else if (last.current !== next) {
+        // 玩家没有按既定顺序拼装 → 触发红色 Toast 反馈
+        onWrongOrder.current?.();
       }
       mesh.visible = false;
       last.current = null; S.snap = false;
     }
+
 
     // S.part 变了 → 切换几何体 + 显隐
     if (S.part !== last.current) {
@@ -139,7 +145,30 @@ function Scene({ placed, onPlace }: { placed: Set<string>; onPlace: React.Mutabl
 export default function Page() {
   const [placed, setPlaced] = useState<Set<string>>(new Set());
   const [hint, setHint] = useState("Hold a part image, drag to table, release on target.");
+  const [showToast, setShowToast] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const onPlaceRef = useRef<(n: string) => void>(null);
+  const onWrongOrderRef = useRef<(() => void) | null>(null);
+
+  // 任务一：错误拼装（未按顺序）→ 触发红色 Toast，3 秒后自动消失
+  useEffect(() => {
+    onWrongOrderRef.current = () => {
+      setShowToast(true);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showToast) return;
+    const t = setTimeout(() => setShowToast(false), 3000);
+    return () => clearTimeout(t);
+  }, [showToast]);
+
+  // 任务二：全部拼装完成 → 触发绿色 Modal（需手动确认）
+  useEffect(() => {
+    if (placed.size === ORDER.length) {
+      setShowModal(true);
+    }
+  }, [placed]);
 
   useEffect(() => {
     onPlaceRef.current = (name: string) => {
@@ -148,6 +177,7 @@ export default function Page() {
       setHint(rem.length ? `Placed ${LABEL[name]}. Next: ${LABEL[rem[0]]}` : "Complete!");
     };
   }, [placed]);
+
 
   useEffect(() => {
     const mv = (e: MouseEvent) => {
@@ -188,7 +218,7 @@ export default function Page() {
       </div>
       <div id="cvs" className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <Canvas camera={{ position: [0, 7, -9], fov: 50, near: 0.5, far: 200 }} gl={{ antialias: true }} style={{ background: "#f8fafc" }}>
-          <Scene placed={placed} onPlace={onPlaceRef} />
+          <Scene placed={placed} onPlace={onPlaceRef} onWrongOrder={onWrongOrderRef} />
         </Canvas>
       </div>
     </div>
@@ -197,5 +227,34 @@ export default function Page() {
       <span className="text-[13px] text-slate-500 truncate flex-1">{hint}</span>
       <span className="text-[11px] text-slate-400">{placed.size}/{ORDER.length} placed</span>
     </div>
+
+    {/* 任务一：错误拼装红色 Toast（3 秒自动消失） */}
+    {showToast && (
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+        <div className="px-5 py-3 rounded-xl bg-red-500 text-white text-sm font-medium shadow-lg shadow-red-500/30 flex items-center gap-2">
+          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Please follow the order.
+        </div>
+      </div>
+    )}
+
+    {/* 任务二：全部拼装完成绿色 Modal（需手动确认） */}
+    {showModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="mx-4 max-w-md w-full rounded-2xl bg-white p-8 shadow-2xl text-center">
+          <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-green-100 flex items-center justify-center">
+            <svg className="w-8 h-8 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-800 mb-2">Assembly Complete</h3>
+          <p className="text-sm text-slate-500 leading-relaxed mb-6">You've successfully assembled the robot arm—take a close look at its structure!</p>
+          <button onClick={() => setShowModal(false)} className="px-6 py-2.5 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 transition-colors cursor-pointer">
+            Confirm
+          </button>
+
+        </div>
+      </div>
+    )}
   </div>);
 }
+
+

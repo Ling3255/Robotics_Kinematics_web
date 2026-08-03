@@ -1,10 +1,12 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
 import { GizmoHelper, GizmoViewport, useTexture } from "@react-three/drei";
 import { useBottomPanelStore } from "@/store/useBottomPanelStore";
+
 import HintBox from "@/components/ui/HintBox";
 import AxisMatchingPanel, { isAxisMatchingComplete } from "./components/AxisMatchingPanel";
 import PositionVectorPanel from "./components/PositionVectorPanel";
@@ -178,8 +180,21 @@ export default function PositionPage() {
   const [qPosition, setQPosition] = useState<Vec3Position>(INITIAL_Q_POSITION);
   const [targetPosition, setTargetPosition] = useState<Vec3Position | null>(null);
   const [vectorComplete, setVectorComplete] = useState(false);
+  const [showGameHint, setShowGameHint] = useState(false);
+  // Quiz stage state (after the 3D coin-collecting game)
+  const [quizActive, setQuizActive] = useState(false);
+  const [q1Answer, setQ1Answer] = useState<"" | "A" | "B" | "C" | "D">("");
+  const [q2Answer, setQ2Answer] = useState<"" | "A" | "B" | "C" | "D">("");
+  const [q1Submitted, setQ1Submitted] = useState(false);
+  const [q2Submitted, setQ2Submitted] = useState(false);
+  const [q1Correct, setQ1Correct] = useState(false);
+  const [q2Correct, setQ2Correct] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const router = useRouter();
   const setBottomPanel = useBottomPanelStore((state) => state.setConfig);
   const resetBottomPanel = useBottomPanelStore((state) => state.resetConfig);
+
+
 
   const frameComplete = roomAnswer === "Yes" && canMoveAnswer === "No";
   const axisComplete = isAxisMatchingComplete(axisAnswers);
@@ -211,6 +226,56 @@ export default function PositionPage() {
     }
   }, []);
 
+  // When the 3D game is won, wait 2s then switch to the quiz stage
+  const handleGameWin = useCallback(() => {
+    setTimeout(() => {
+      setQuizActive(true);
+    }, 2000);
+  }, []);
+
+  // Validate Q1 and Q2 independently on submit
+  const handleQuizSubmit = useCallback(() => {
+    if (q1Answer) {
+      setQ1Submitted(true);
+      setQ1Correct(q1Answer === "C");
+    }
+    if (q2Answer) {
+      setQ2Submitted(true);
+      setQ2Correct(q2Answer === "A");
+    }
+  }, [q1Answer, q2Answer]);
+
+  // Reset in quiz stage: cancel quiz and return to the 3D map stage
+  const handleQuizReset = useCallback(() => {
+    setQuizActive(false);
+    setQ1Answer("");
+    setQ2Answer("");
+    setQ1Submitted(false);
+    setQ2Submitted(false);
+    setQ1Correct(false);
+    setQ2Correct(false);
+    setShowSuccessModal(false);
+    setShowGameHint(false);
+    setResetKey((key) => key + 1);
+  }, []);
+
+  // When both questions are correct: wait 2s, show green modal, wait 2s, route to /orientation
+  useEffect(() => {
+    if (!quizActive) return;
+    if (!(q1Correct && q2Correct)) return;
+
+    const modalTimer = setTimeout(() => setShowSuccessModal(true), 2000);
+    return () => clearTimeout(modalTimer);
+  }, [quizActive, q1Correct, q2Correct]);
+
+  useEffect(() => {
+    if (!showSuccessModal) return;
+    const routeTimer = setTimeout(() => {
+      router.push("/orientation");
+    }, 2000);
+    return () => clearTimeout(routeTimer);
+  }, [showSuccessModal, router]);
+
   useEffect(() => {
     const isStepOne = page === 1;
     const isStepTwo = page === 2;
@@ -239,6 +304,24 @@ export default function PositionPage() {
       return;
     }
 
+    // Quiz stage bottom panel: Next disabled until both questions are correct
+    if (quizActive) {
+      setBottomPanel({
+        hint: "Answer both questions correctly to continue.",
+        checkDisabled: true,
+        checkLabel: "Previous",
+        nextDisabled: !(q1Correct && q2Correct),
+        resetDisabled: false,
+        onReset: handleQuizReset,
+        onNext: () => {
+          if (q1Correct && q2Correct) {
+            setShowSuccessModal(true);
+          }
+        },
+      });
+      return;
+    }
+
     setBottomPanel({
       hint: "Collect all 8 coins to win! WASD to move, Shift to sprint, Space to jump.",
       checkDisabled: false,
@@ -248,13 +331,172 @@ export default function PositionPage() {
       resetDisabled: false,
       onReset: resetCurrentPage,
     });
-  }, [axisComplete, frameComplete, vectorComplete, goToPage, page, resetCurrentPage, setBottomPanel]);
+  }, [axisComplete, frameComplete, vectorComplete, goToPage, page, resetCurrentPage, setBottomPanel, quizActive, q1Correct, q2Correct, handleQuizReset]);
+
 
   useEffect(() => resetBottomPanel, [resetBottomPanel]);
 
+  // Show the one-time hint modal when entering the game page (page 4)
+  useEffect(() => {
+    if (page === 4) {
+      setShowGameHint(true);
+    } else {
+      setShowGameHint(false);
+    }
+  }, [page]);
+
   if (page === 4) {
-    return <GameScene />;
+    // Quiz stage: pure-color background with the two questions
+    if (quizActive) {
+      const options: { key: "A" | "B" | "C" | "D"; label: string }[] = [
+        { key: "A", label: "The coin objects in the game" },
+        { key: "B", label: "The movable ball that collects coins" },
+        { key: "C", label: "Fixed reference origin of the game scene (the initial spawn point of the ball)" },
+        { key: "D", label: "The end position where the ball moves to" },
+      ];
+
+      const renderOption = (
+        qKey: "q1" | "q2",
+        answer: "" | "A" | "B" | "C" | "D",
+        submitted: boolean,
+        correct: boolean,
+        onSelect: (value: "A" | "B" | "C" | "D") => void
+      ) => {
+        return options.map((opt) => {
+          const isSelected = answer === opt.key;
+          const isLocked = submitted && correct;
+          const showCorrect = submitted && correct && isSelected;
+          const showWrong = submitted && !correct && isSelected;
+          return (
+            <label
+              key={opt.key}
+              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-colors ${
+                isSelected
+                  ? "border-slate-500 bg-slate-100"
+                  : "border-slate-200 bg-white hover:bg-slate-50"
+              } ${isLocked ? "cursor-default opacity-90" : ""}`}
+            >
+              <input
+                type="radio"
+                name={qKey}
+                value={opt.key}
+                checked={isSelected}
+                disabled={isLocked}
+                onChange={() => onSelect(opt.key)}
+                className="h-4 w-4 cursor-pointer accent-slate-700"
+              />
+              <span className="text-sm text-slate-700">
+                <span className="font-semibold">{opt.key}.</span> {opt.label}
+              </span>
+              {showCorrect && (
+                <span className="ml-auto text-lg font-bold text-green-600">✓</span>
+              )}
+              {showWrong && (
+                <span className="ml-auto text-lg font-bold text-red-500">✗</span>
+              )}
+            </label>
+          );
+        });
+      };
+
+      return (
+        <div className="flex h-[calc(100vh-112px)] w-full flex-col items-center overflow-y-auto bg-slate-100 p-8">
+          <div className="w-full max-w-3xl">
+            <h2 className="mb-6 text-center text-2xl font-bold text-slate-800">
+              Quiz
+            </h2>
+
+            {/* Q1 */}
+            <div className="mb-8 rounded-2xl bg-white p-6 shadow-md">
+              <p className="mb-4 text-base font-semibold text-slate-800">
+                Q1. What does coordinate system U refer to in the ball coin-collecting game level?
+              </p>
+              <div className="space-y-2">
+                {renderOption(
+                  "q1",
+                  q1Answer,
+                  q1Submitted,
+                  q1Correct,
+                  (value) => {
+                    setQ1Answer(value);
+                    setQ1Submitted(false);
+                    setQ1Correct(false);
+                  }
+                )}
+              </div>
+            </div>
+
+            {/* Q2 */}
+            <div className="mb-8 rounded-2xl bg-white p-6 shadow-md">
+              <p className="mb-4 text-base font-semibold text-slate-800">
+                Q2. What object does symbol Q stand for in this interactive level?
+              </p>
+              <div className="space-y-2">
+                {renderOption(
+                  "q2",
+                  q2Answer,
+                  q2Submitted,
+                  q2Correct,
+                  (value) => {
+                    setQ2Answer(value);
+                    setQ2Submitted(false);
+                    setQ2Correct(false);
+                  }
+                )}
+              </div>
+            </div>
+
+            {/* Submit button */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleQuizSubmit}
+                disabled={!q1Answer || !q2Answer}
+                className="cursor-pointer rounded-lg bg-slate-800 px-8 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+
+          {/* Green success modal */}
+          {showSuccessModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+              <div className="mx-4 max-w-md rounded-2xl border-2 border-green-500 bg-green-50 px-8 py-8 text-center shadow-2xl">
+                <p className="text-lg font-semibold leading-relaxed text-green-800">
+                  Correct！Let's start learning about the orientation of objects.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <>
+        <GameScene resetKey={resetKey} onWin={handleGameWin} />
+        {showGameHint && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="mx-4 max-w-md rounded-2xl bg-white/90 px-8 py-8 text-center shadow-2xl backdrop-blur">
+              <p className="text-lg font-semibold leading-relaxed text-slate-800">
+                Try to move the small ball and eat up all the gold coins. Pay attention to observing the changes in the coordinates.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowGameHint(false)}
+                className="mt-6 cursor-pointer rounded-lg bg-slate-800 px-8 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
+
+
 
   return (
     <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1 lg:h-[calc(100vh-112px)]">

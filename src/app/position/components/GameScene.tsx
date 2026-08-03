@@ -462,27 +462,24 @@ function SceneContent({
 // Generate coin positions
 // ============================================================
 function generateCoins(count: number): CoinData[] {
-  const positions: [number, number, number][] = [
+  // 5 coins on the flat green ground (y = 0.2)
+  const groundPositions: [number, number, number][] = [
     [-3, 0.2, -3],
     [3, 0.2, -3],
     [-3, 0.2, 3],
     [3, 0.2, 3],
-    [0, 0.2, -5],
-    [0, 0.2, 5],
-    [-7, 0.2, -2],
-    [7, 0.2, -2],
-    [-7, 0.2, 2],
-    [7, 0.2, 2],
-    [-5, 1.2, -5],
-    [5, 1.2, -5],
-    [-5, 1.2, 5],
-    [5, 1.2, 5],
-    [0, 1.7, 0],
-    [-8, 2.2, 0],
-    [8, 2.2, 0],
-    [0, 2.7, -8],
-    [0, 2.7, 8],
-    [-10, 0.2, -6],
+    [0, 0.2, 0],
+  ];
+  // 3 coins on top of colored platforms (yellow, blue, orange)
+  const platformPositions: [number, number, number][] = [
+    [-5, 1.2, -5], // yellow platform top (top y = 1.0)
+    [-5, 1.2, 5], // blue platform top (top y = 1.0)
+    [0, 2.45, -8], // orange platform top (top y = 2.25)
+  ];
+
+  const positions: [number, number, number][] = [
+    ...groundPositions,
+    ...platformPositions,
   ];
 
   while (positions.length < count) {
@@ -497,6 +494,7 @@ function generateCoins(count: number): CoinData[] {
     collected: false,
   }));
 }
+
 
 // ============================================================
 // Play bell sound using Web Audio API
@@ -527,7 +525,13 @@ function playBellSound() {
 // ============================================================
 // Coordinate overlay (top-right)
 // ============================================================
-function CoordinateOverlay({ posRef }: { posRef: React.MutableRefObject<THREE.Vector3> }) {
+function CoordinateOverlay({
+  posRef,
+  pulse,
+}: {
+  posRef: React.MutableRefObject<THREE.Vector3>;
+  pulse: boolean;
+}) {
   const textRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -545,12 +549,23 @@ function CoordinateOverlay({ posRef }: { posRef: React.MutableRefObject<THREE.Ve
 
   return (
     <div className="absolute right-4 top-4 z-10 rounded-lg bg-white/90 px-4 py-3 shadow-lg backdrop-blur">
-      <span ref={textRef} className="font-mono text-base font-bold tabular-nums text-gray-700">
+      <span
+        ref={textRef}
+        className={`font-mono text-base font-bold tabular-nums transition-all duration-500 ${
+          pulse ? "animate-pulse text-[#00BFFF]" : "text-gray-700"
+        }`}
+        style={{
+          transform: pulse ? "scale(3)" : "scale(1)",
+          transformOrigin: "right top",
+          display: "inline-block",
+        }}
+      >
         X 0.00  Y 0.00  Z 0.00
       </span>
     </div>
   );
 }
+
 
 // ============================================================
 // Decorative elements data (trees, platforms, bridges)
@@ -612,15 +627,24 @@ function DecorativeElements({ visibleCount }: { visibleCount: number }) {
 // ============================================================
 // Main GameScene component
 // ============================================================
-export default function GameScene() {
+export default function GameScene({
+  resetKey = 0,
+  onWin,
+}: {
+  resetKey?: number;
+  onWin?: () => void;
+}) {
+
   const [coins, setCoins] = useState<CoinData[]>([]);
   const [frozen, setFrozen] = useState(false);
   const [won, setWon] = useState(false);
   const [coreReady, setCoreReady] = useState(false);
   const [decorativeCount, setDecorativeCount] = useState(0);
+  const [pulse, setPulse] = useState(false);
   const posRef = useRef(new THREE.Vector3(0, 0, 0));
   const initialized = useRef(false);
   const collectedSet = useRef(new Set<number>());
+  const pulseTimer = useRef<number | null>(null);
 
   // Initialize coins
   useEffect(() => {
@@ -629,6 +653,26 @@ export default function GameScene() {
       initialized.current = true;
     }
   }, []);
+
+  // Trigger the coordinate zoom/highlight/blink effect for 2 seconds
+  const triggerPulse = useCallback(() => {
+    if (pulseTimer.current) window.clearTimeout(pulseTimer.current);
+    setPulse(true);
+    pulseTimer.current = window.setTimeout(() => setPulse(false), 2000);
+  }, []);
+
+  // Reset: restore coins to initial positions, clear collected state,
+  // and immediately clear the coordinate pulse effect
+  useEffect(() => {
+    if (resetKey === 0) return;
+    if (pulseTimer.current) window.clearTimeout(pulseTimer.current);
+    setPulse(false);
+    setCoins(generateCoins(COIN_COUNT));
+    collectedSet.current.clear();
+    setWon(false);
+    setFrozen(false);
+  }, [resetKey]);
+
 
   // Mark core assets as ready once coins are generated
   useEffect(() => {
@@ -664,6 +708,9 @@ export default function GameScene() {
     (id: number) => {
       if (frozen) return;
 
+      // Trigger the coordinate zoom/highlight/blink effect on pickup
+      triggerPulse();
+
       setCoins((prev) => {
         const coin = prev.find((c) => c.id === id);
         if (!coin || coin.collected) return prev;
@@ -679,14 +726,17 @@ export default function GameScene() {
           setTimeout(() => {
             setFrozen(true);
             setWon(true);
+            onWin?.();
           }, 300);
         }
 
         return updated;
       });
     },
-    [frozen]
+    [frozen, triggerPulse, onWin]
   );
+
+
 
   return (
     <div className="relative h-[calc(100vh-112px)] w-full">
@@ -710,8 +760,9 @@ export default function GameScene() {
 
       <LoadingOverlay visible={!coreReady} />
       <CoinCounter remaining={remaining} />
-      <CoordinateOverlay posRef={posRef} />
+      <CoordinateOverlay posRef={posRef} pulse={pulse} />
       {won && <WinOverlay />}
+
 
       <HintBox hintLabel="Controls">
         <p>WASD / Arrow keys: move</p>
