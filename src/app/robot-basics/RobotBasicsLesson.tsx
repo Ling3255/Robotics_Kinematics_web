@@ -154,7 +154,7 @@ export default function RobotBasicsLesson() {
 
     if (page === 1) {
       setBottomPanel({
-        hint: "Drag and drop parts to build your own robotic arm.",
+        hint: "Step 1: Identify parts by dragging labels → Step 2: Drag parts to assemble the arm → Step 3: Verify part counts.",
         checkDisabled: true,
         checkLabel: "Previous",
         nextDisabled: false,
