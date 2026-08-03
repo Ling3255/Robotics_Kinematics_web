@@ -335,7 +335,10 @@ function Player({
       }
     }
 
-    posRef.current.set(pos.x, pos.y, pos.z);
+    // Displayed coordinates follow the lesson's Z-up convention:
+    // display X = world x, display Y = -world z (ground plane),
+    // display Z = height above ground (ball radius 0.4 rests at world y = 0.4 → display Z = 0).
+    posRef.current.set(pos.x, -pos.z, pos.y - 0.4);
 
     const camOffset = new THREE.Vector3(0, 4, 6);
     const targetPos = new THREE.Vector3(pos.x, pos.y + 1.5, pos.z);
@@ -345,10 +348,11 @@ function Player({
     camera.lookAt(cameraTarget.current);
   });
 
+  // Spawn resting on the ground (ball radius 0.4) so the initial displayed position is (0, 0, 0)
   return (
     <RigidBody
       ref={rigidBodyRef}
-      position={[0, 2, 0]}
+      position={[0, 0.4, 0]}
       type="dynamic"
       colliders={false}
       enabledRotations={[false, false, false]}
@@ -539,7 +543,9 @@ function CoordinateOverlay({
     const tick = () => {
       if (textRef.current) {
         const p = posRef.current;
-        textRef.current.textContent = `X ${p.x.toFixed(2)}  Y ${p.y.toFixed(2)}  Z ${p.z.toFixed(2)}`;
+        // Snap tiny values to 0 so physics jitter doesn't render as "-0.00"
+        const fmt = (v: number) => (Math.abs(v) < 0.005 ? 0 : v).toFixed(2);
+        textRef.current.textContent = `X ${fmt(p.x)}  Y ${fmt(p.y)}  Z ${fmt(p.z)}`;
       }
       rafId = requestAnimationFrame(tick);
     };
