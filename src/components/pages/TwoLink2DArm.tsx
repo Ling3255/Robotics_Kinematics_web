@@ -432,9 +432,6 @@ export default function TwoLink2DArm() {
     <div className="flex flex-col h-full">
       {/* ===== Header ===== */}
       <div className="flex items-center gap-3 px-8 pt-3 pb-3 shrink-0">
-        <span className="px-4 py-2 text-[13px] font-medium rounded-lg bg-slate-800 text-white">
-          Forward Kinematics — 2-Link Planar Arm
-        </span>
         <span className="flex-1" />
         <button
           onClick={() => setShowTrail(!showTrail)}
