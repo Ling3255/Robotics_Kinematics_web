@@ -96,21 +96,22 @@ export default function OrientationLesson() {
   // Page 1: Single-axis rotation
   if (page === 1) {
     return (
-      <section className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1">
+      <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1 lg:h-[calc(100vh-112px)]">
         <SingleAxisRotator
           resetKey={resetKey}
           matrixRef={matrixRef}
           onMatrixChange={handleMatrixChange}
         />
-        <div className="flex flex-col gap-4 overflow-auto">
+        <div className="flex min-h-0 flex-col gap-4 overflow-auto">
           <RotationMatrixPanel matrixRef={matrixRef} isActive={true} />
           <Feedback variant="info" title="Step by Step">
             Start with one axis at a time. Notice how a rotation about <strong>X</strong> only changes the Y-Z columns of the matrix.
             This is the simplest way to understand how each angle maps to the 3×3 matrix.
           </Feedback>
           <Feedback variant="success" title="Key Point">
-            单轴旋转只改变矩阵中对应的两个列。比如绕 X 轴旋转，列 2 和列 3 变化，列 1 不变。
-            这就是为什么旋转矩阵是"列向量"的集合——每一列对应 B 系的一个轴在 U 系中的投影。
+            A single-axis rotation only changes the two corresponding columns of the matrix. Rotating about X, for example,
+            changes columns 2 and 3 while column 1 stays fixed. That is why a rotation matrix is a set of column vectors —
+            each column is one B-frame axis projected onto the U frame.
           </Feedback>
         </div>
       </section>
@@ -120,7 +121,7 @@ export default function OrientationLesson() {
   // Page 2: Concept checkpoint — interactive 3D demo + "Is this a position change?"
   if (page === 2) {
     return (
-      <section className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1">
+      <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1 lg:h-[calc(100vh-112px)]">
         <div className="flex h-full flex-col gap-3">
           {/* Header */}
           <div className="shrink-0 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-sm">
@@ -160,14 +161,14 @@ export default function OrientationLesson() {
   // Page 3: Free rotation with U/B frames + axis lock controls
   if (page === 3) {
     return (
-      <section className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1">
+      <section className="grid min-h-0 grid-cols-[minmax(0,1fr)_340px] gap-4 bg-slate-50 p-4 max-lg:grid-cols-1 lg:h-[calc(100vh-112px)]">
         <RotationSphereScene
           resetKey={resetKey}
           matrixRef={matrixRef}
           onMatrixChange={handleMatrixChange}
           isActive={true}
         />
-        <div className="flex flex-col gap-4 overflow-auto">
+        <div className="flex min-h-0 flex-col gap-4 overflow-auto">
           <RotationMatrixPanel matrixRef={matrixRef} isActive={true} />
           <Feedback variant="info" title="U vs B Frames">
             The <strong>U frame</strong> (X_U, Y_U, Z_U) is the fixed world coordinate system — it never moves.
@@ -176,7 +177,7 @@ export default function OrientationLesson() {
           </Feedback>
           <Feedback variant="success" title="You've got it!">
             Notice that rotation never moves the center — only the axes spin. That's why we say orientation is independent of position.
-            观察橙色弧线的角度变化：它实时反映 B 系相对 U 系的偏转量。
+            Watch the orange arc as it changes — it shows, in real time, how far the B frame has rotated away from the U frame.
           </Feedback>
         </div>
       </section>
@@ -185,11 +186,11 @@ export default function OrientationLesson() {
 
   // Page 4: Backflip viewer with U/B dual coordinate frames
   return (
-    <div className="flex h-full flex-col bg-slate-50">
+    <div className="flex min-h-0 flex-col bg-slate-50 lg:h-[calc(100vh-112px)]">
       <BackflipViewer />
       {/* Summary bar at bottom of side panel area — shown below the viewer */}
       <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-3">
-        <div className="mx-auto max-w-4xl flex gap-4">
+        <div className="mx-auto flex max-w-4xl gap-4 max-lg:flex-col">
           <Feedback variant="info" title="U Frame (World)" className="flex-1">
             X_U, Y_U, Z_U — fixed world axes. They are the <strong>absolute reference</strong>. No matter how the character or cube
             rotates, U stays put.

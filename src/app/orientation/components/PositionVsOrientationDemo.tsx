@@ -174,19 +174,19 @@ export default function PositionVsOrientationDemo({ className = "" }: PositionVs
   const [mode, setMode] = useState<DemoMode>("position");
 
   const modeLabel: Record<DemoMode, string> = {
-    position: "位置变化（平移）",
-    orientation: "朝向变化（旋转）",
+    position: "Position (Translation)",
+    orientation: "Orientation (Rotation)",
   };
 
   const modeHint: Record<DemoMode, string> = {
-    position: "立方体在空间中移动——中心点离开了原点",
-    orientation: "立方体在原位旋转——中心点始终在原点上",
+    position: "The cube moves through space — its center leaves the origin.",
+    orientation: "The cube spins in place — its center stays on the origin.",
   };
 
   const cubeCenterQuestion =
     mode === "position"
-      ? "✓ 物体中心离开了原点 → 这是位置变化"
-      : "✗ 物体中心没离开原点 → 这不是位置变化";
+      ? "✓ The center left the origin → this IS a position change"
+      : "✗ The center never left the origin → this is NOT a position change";
 
   return (
     <div
@@ -205,8 +205,7 @@ export default function PositionVsOrientationDemo({ className = "" }: PositionVs
       <div className="shrink-0 border-t border-slate-200 bg-white/90 px-3 py-2.5 backdrop-blur">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-            演示模式：
-          </span>
+            Demo Mode:          </span>
           <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
             {(["position", "orientation"] as const).map((m) => (
               <button

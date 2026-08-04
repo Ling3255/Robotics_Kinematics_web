@@ -64,8 +64,8 @@ export default function PositionChangeQuiz({ answer, onAnswer }: PositionChangeQ
             of the origin point does not move at all. This distinction is the foundation of rigid-body transformations.
           </Feedback>
           <Feedback variant="success" title="Summary">
-            记住：只要物体中心（origin）没动，就不是位置变化。旋转改变的是朝向（orientation），不是位置（position）。
-            这个区分是整个机器人学姿态描述的基础。
+            Remember: as long as the center of the object (the origin) does not move, it is not a position change.
+            Rotation changes orientation, not position — and this distinction is the foundation of pose description in robotics.
           </Feedback>
         </>
       )}

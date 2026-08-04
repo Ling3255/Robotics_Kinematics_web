@@ -324,7 +324,7 @@ export default function BackflipViewer() {
   const matrixRef = useRef([...INITIAL_ROTATION_MATRIX]);
 
   return (
-    <div className="relative h-[calc(100vh-112px)] w-full">
+    <div className="relative min-h-[420px] w-full flex-1 lg:min-h-0">
       <div className="flex h-full w-full">
         <div className="relative h-full w-1/2 bg-slate-50">
           <Canvas>
