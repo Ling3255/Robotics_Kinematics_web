@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>2-Link IK Demo — Click to set target</title>
+  <title>2-Link Inverse Kinematics Demo</title>
   <style>
     body { margin: 0; font-family: system-ui, Arial; overflow: hidden; }
     #ui { position: absolute; left: 12px; top: 12px; background: rgba(255,255,255,0.94); padding: 10px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.18); z-index: 2; }
@@ -12,6 +12,26 @@
     #angles { margin-top: 6px; font-size: 13px; }
     button { margin-left: 8px; }
     canvas { display: block; }
+    #info {
+      position: absolute; right: 12px; top: 12px; bottom: 12px;
+      width: 300px; overflow-y: auto;
+      background: rgba(255,255,255,0.95);
+      border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+      padding: 14px 16px; font-size: 13px; line-height: 1.6; z-index: 2;
+      font-family: system-ui, Arial, sans-serif; color: #222;
+    }
+    #info h1 { font-size: 16px; margin: 0 0 6px; color: #113; }
+    #info h2 { font-size: 14px; margin: 12px 0 4px; color: #2266cc; }
+    #info p  { margin: 6px 0; }
+    #info .formula {
+      background: #f4f5ff; border-left: 3px solid #2266cc;
+      padding: 6px 10px; margin: 6px 0; border-radius: 4px;
+      font-family: Consolas, Menlo, monospace; font-size: 12px; overflow-x: auto;
+    }
+    #info ul { margin: 6px 0 6px 18px; padding: 0; }
+    #info li { margin: 3px 0; }
+    #info .legend { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+    #info .swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
   </style>
 </head>
 <body>
@@ -20,8 +40,51 @@
       <label><input id="elbow" type="checkbox"> Elbow Up</label>
       <button id="reset">Reset Target</button>
     </div>
-    <div id="status">Click anywhere on the plane to set the target.</div>
-    <div id="angles">θ1: <span id="t1">—</span>°, θ2: <span id="t2">—</span>°</div>
+    <div id="status">Click / drag on the plane to set the target.</div>
+    <div id="angles">θ1 Base: <span id="t1">—</span>°, &nbsp; θ2 Elbow: <span id="t2">—</span>°</div>
+  </div>
+
+  <div id="info">
+    <h1>🤖 Inverse Kinematics (IK)</h1>
+    <p><b>Goal: given a target position for the end-effector, solve for the joint angles that make the arm reach it.</b></p>
+
+    <h2>What is Inverse Kinematics?</h2>
+    <p>A robot arm is made of links and joints. Computing the end-effector position from known joint angles is called <b>Forward Kinematics</b>. <b>Inverse Kinematics</b> is the opposite: <b>given a desired end-effector position, work backwards to find the joint angles</b>.</p>
+    <p>We usually want the arm tip to reach and grasp a point, so IK is one of the most common problems in robot control.</p>
+
+    <h2>The 2-Link Arm in This Demo</h2>
+    <ul>
+      <li>Link 1 length L1 = 50 (base to elbow)</li>
+      <li>Link 2 length L2 = 80 (elbow to end-effector)</li>
+      <li>θ1: <b>Base angle</b>, the angle of link 1 with the +X axis (red)</li>
+      <li>θ2: <b>Elbow angle</b>, the angle between link 1 and link 2 (blue)</li>
+    </ul>
+    <div class="legend"><span class="swatch" style="background:#cc3333"></span> θ1 — Base angle</div>
+    <div class="legend"><span class="swatch" style="background:#2266cc"></span> θ2 — Elbow angle</div>
+
+    <h2>Analytic Solution (Law of Cosines)</h2>
+    <p>Let d be the distance from the target to the base. From the law of cosines, solve θ2:</p>
+    <div class="formula">cos θ2 = (d² − L1² − L2²) / (2·L1·L2)</div>
+    <p>Then use the horizontal balance to solve θ1:</p>
+    <div class="formula">θ1 = atan2(y, x) − atan2(L2·sinθ2, L1 + L2·cosθ2)</div>
+
+    <h2>Multiple Solutions & "Elbow Up/Down"</h2>
+    <p>For the same target there are usually <b>two</b> arm configurations: elbow up or elbow down.</p>
+    <p>Checking <b>Elbow Up</b> above switches between the two solutions — a demonstration of IK's <b>multiple-solution</b> nature. Real robots pick the best one based on joint limits or energy use.</p>
+
+    <h2>Reachable Workspace</h2>
+    <p>The end-effector can only reach points within a ring: outer radius R = L1+L2 = 130, inner radius r = |L1−L2| = 30.</p>
+    <ul>
+      <li>Target inside the ring → solvable (green)</li>
+      <li>Target outside the ring → unreachable (red)</li>
+    </ul>
+
+    <h2>How to Interact</h2>
+    <ul>
+      <li><b>Click or drag</b> on the plane to set the target point</li>
+      <li>Press <b>Reset Target</b> to reset</li>
+      <li>Check <b>Elbow Up</b> to switch the solution</li>
+    </ul>
   </div>
 
   <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
@@ -121,6 +184,122 @@
     });
     elCheckbox.addEventListener('change', () => updateFromTarget());
 
+    // ---------------------------------------------------------------
+    // Angle annotations (arcs + text labels drawn in the 3D scene)
+    // ---------------------------------------------------------------
+    // Render text onto a canvas and return a THREE.Sprite label. The
+    // returned sprite exposes a setLabel(text) method that re-draws the
+    // canvas image and re-scales the sprite to match the new text width.
+    function makeTextSprite(msg, opts) {
+      opts = opts || {};
+      const fontSize = opts.fontSize || 80;
+      const color = opts.color || '#111111';
+      const bgcolor = opts.bgcolor || 'rgba(255,255,255,0.92)';
+      const padding = opts.padding || 14;
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Draw (or re-draw) the current message. Resizing the canvas resets
+      // its context, so we re-apply all state inside redraw().
+      function redraw(m) {
+        ctx.font = 'bold ' + fontSize + 'px Arial, sans-serif';
+        const w = Math.ceil(ctx.measureText(m).width) + padding * 2;
+        const h = Math.ceil(fontSize * 1.5) + padding * 2;
+        canvas.width = w;
+        canvas.height = h;
+        ctx.font = 'bold ' + fontSize + 'px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = bgcolor;
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
+        ctx.fillStyle = color;
+        ctx.fillText(m, w / 2, h / 2);
+      }
+      redraw(msg);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      const baseH = opts.scale || 1.0;
+      sprite.scale.set((canvas.width / canvas.height) * baseH, baseH, 1);
+
+      sprite.setLabel = function (m) {
+        if (m === msg) return;
+        msg = m;
+        redraw(m);
+        sprite.scale.set((canvas.width / canvas.height) * baseH, baseH, 1);
+        texture.needsUpdate = true;
+      };
+      return sprite;
+    }
+
+    // Helper: build an arc (series of points) on the XY plane from
+    // startAngle to endAngle at given radius around a center point.
+    function makeArcPoints(cx, cy, radius, startAngle, endAngle, segments) {
+      segments = segments || 48;
+      const pts = [];
+      for (let i = 0; i <= segments; i++) {
+        const a = startAngle + (endAngle - startAngle) * (i / segments);
+        pts.push(new THREE.Vector3(cx + radius * Math.cos(a), cy + radius * Math.sin(a), 0));
+      }
+      return pts;
+    }
+
+    function makeArcLine(cx, cy, radius, startAngle, endAngle, color, segments) {
+      const geo = new THREE.BufferGeometry().setFromPoints(
+        makeArcPoints(cx, cy, radius, startAngle, endAngle, segments)
+      );
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.9 }));
+      return line;
+    }
+
+    // Arc radius and colors for the two angles
+    const arcR1 = 22;   // θ1 arc near the base
+    const arcR2 = 18;   // θ2 arc near the elbow
+    const colorTheta1 = 0xcc3333;
+    const colorTheta2 = 0x2266cc;
+
+    // Objects to update on every IK solve
+    const arc1 = makeArcLine(0, 0, arcR1, 0, 0, colorTheta1);   // regenerated in update
+    const arc2 = makeArcLine(0, 0, arcR2, 0, 0, colorTheta2);
+    scene.add(arc1, arc2);
+
+    // Guide lines for the θ2 arc: two thin segments from the elbow joint to
+    // the arc endpoints, so the blue angle reads as a complete angle
+    // (arc + its two arms), like in classic IK diagrams. Drawn dashed and
+    // slightly longer than the arc so the two arms stand out clearly.
+    const guideGeo = new THREE.BufferGeometry();
+    guideGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+    const guideLine = new THREE.Line(guideGeo, new THREE.LineDashedMaterial({ color: colorTheta2, transparent: true, opacity: 0.6, dashSize: 2.2, gapSize: 1.4 }));
+    scene.add(guideLine);
+
+    function setGuidePoints(cx, cy, radius, startAngle, endAngle) {
+      const r = radius * 1.8; // extend the guide arms beyond the arc
+      const a = guideGeo.attributes.position.array;
+      a[0] = cx + r * Math.cos(startAngle); a[1] = cy + r * Math.sin(startAngle); a[2] = 0;
+      a[3] = cx; a[4] = cy; a[5] = 0;
+      a[6] = cx + r * Math.cos(endAngle); a[7] = cy + r * Math.sin(endAngle); a[8] = 0;
+      guideGeo.attributes.position.needsUpdate = true;
+      guideLine.computeLineDistances();
+    }
+
+    // Helper to replace an arc's points in place
+    function setArcPoints(line, cx, cy, radius, startAngle, endAngle, segments) {
+      const pts = makeArcPoints(cx, cy, radius, startAngle, endAngle, segments);
+      line.geometry.setFromPoints(pts);
+    }
+
+    // Point-label sprites showing the angle NAMES right at the arcs,
+    // with real-time angle values updated live in updateAngleAnnotations.
+    const labelTheta1 = makeTextSprite('θ1 Base = —°', { color: '#cc3333', scale: 4.5 });
+    const labelTheta2 = makeTextSprite('θ2 Elbow = —°', { color: '#2266cc', scale: 4.5 });
+    scene.add(labelTheta1, labelTheta2);
+
+    // ---------------------------------------------------------------
     // Raycaster & plane
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -177,6 +356,37 @@
     let target = new THREE.Vector3(80, 0, 0);
     let reachable = true;
 
+    // Update the arc + label annotations for the current joint angles.
+    // th1 = angle of the first link from +X axis; th2 = relative angle
+    // between link1 and link2 (measured at the elbow joint).
+    function updateAngleAnnotations(th1, th2, jx, jy, innerRadius) {
+      const segs = 48;
+      const start2 = th1;
+      const end2 = th1 + th2;
+
+      // θ1 arc around the origin (base)
+      setArcPoints(arc1, 0, 0, arcR1, 0, th1, segs);
+      // θ2 arc around the elbow joint
+      setArcPoints(arc2, jx, jy, arcR2, start2, end2, segs);
+      // θ2 guide arms: close the arc into a full angle (elbow -> arc endpoints)
+      setGuidePoints(jx, jy, arcR2, start2, end2);
+
+      // θ1 label: at the midpoint of the θ1 arc, pushed outward along the
+      // first link so it stays readable.
+      const mid1 = th1 / 2;
+      const r1label = innerRadius * 1.15;
+      labelTheta1.position.set(r1label * Math.cos(mid1), r1label * Math.sin(mid1), 0);
+      // θ2 label: at the midpoint of the θ2 arc, pushed outward.
+      const mid2 = (start2 + end2) / 2;
+      const r2label = innerRadius * 1.45;
+      labelTheta2.position.set(jx + r2label * Math.cos(mid2), jy + r2label * Math.sin(mid2), 0);
+
+      // Show the real-time angle values right at the labelled arcs.
+      const deg = (r) => (r * 180 / Math.PI).toFixed(1);
+      labelTheta1.setLabel('θ1 Base = ' + deg(th1) + '°');
+      labelTheta2.setLabel('θ2 Elbow = ' + deg(th2) + '°');
+    }
+
     function updateFromTarget() {
       const ik = solve2LinkIK(target.x, target.y, l1, l2, elCheckbox.checked);
       reachable = ik.reachable;
@@ -207,6 +417,7 @@
         eff.position.set(ex, ey, 0);
 
         setSegmentPositions(jx, jy, ex, ey);
+        updateAngleAnnotations(th1, th2, jx, jy, Math.min(l1, l2));
       }
     }
 
@@ -224,6 +435,7 @@
         joint1.position.set(jx, jy, 0);
         eff.position.set(ex, ey, 0);
         setSegmentPositions(jx, jy, ex, ey);
+        updateAngleAnnotations(th1, th2, jx, jy, Math.min(l1, l2));
         t1span.textContent = (th1 * 180 / Math.PI).toFixed(1);
         t2span.textContent = (th2 * 180 / Math.PI).toFixed(1);
         status.textContent = 'Target reachable';
