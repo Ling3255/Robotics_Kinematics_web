@@ -12,26 +12,6 @@
     #angles { margin-top: 6px; font-size: 13px; }
     button { margin-left: 8px; }
     canvas { display: block; }
-    #info {
-      position: absolute; right: 12px; top: 12px; bottom: 12px;
-      width: 300px; overflow-y: auto;
-      background: rgba(255,255,255,0.95);
-      border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.18);
-      padding: 14px 16px; font-size: 13px; line-height: 1.6; z-index: 2;
-      font-family: system-ui, Arial, sans-serif; color: #222;
-    }
-    #info h1 { font-size: 16px; margin: 0 0 6px; color: #113; }
-    #info h2 { font-size: 14px; margin: 12px 0 4px; color: #2266cc; }
-    #info p  { margin: 6px 0; }
-    #info .formula {
-      background: #f4f5ff; border-left: 3px solid #2266cc;
-      padding: 6px 10px; margin: 6px 0; border-radius: 4px;
-      font-family: Consolas, Menlo, monospace; font-size: 12px; overflow-x: auto;
-    }
-    #info ul { margin: 6px 0 6px 18px; padding: 0; }
-    #info li { margin: 3px 0; }
-    #info .legend { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
-    #info .swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
   </style>
 </head>
 <body>
@@ -42,49 +22,6 @@
     </div>
     <div id="status">Click / drag on the plane to set the target.</div>
     <div id="angles">θ1 Base: <span id="t1">—</span>°, &nbsp; θ2 Elbow: <span id="t2">—</span>°</div>
-  </div>
-
-  <div id="info">
-    <h1>🤖 Inverse Kinematics (IK)</h1>
-    <p><b>Goal: given a target position for the end-effector, solve for the joint angles that make the arm reach it.</b></p>
-
-    <h2>What is Inverse Kinematics?</h2>
-    <p>A robot arm is made of links and joints. Computing the end-effector position from known joint angles is called <b>Forward Kinematics</b>. <b>Inverse Kinematics</b> is the opposite: <b>given a desired end-effector position, work backwards to find the joint angles</b>.</p>
-    <p>We usually want the arm tip to reach and grasp a point, so IK is one of the most common problems in robot control.</p>
-
-    <h2>The 2-Link Arm in This Demo</h2>
-    <ul>
-      <li>Link 1 length L1 = 50 (base to elbow)</li>
-      <li>Link 2 length L2 = 80 (elbow to end-effector)</li>
-      <li>θ1: <b>Base angle</b>, the angle of link 1 with the +X axis (red)</li>
-      <li>θ2: <b>Elbow angle</b>, the angle between link 1 and link 2 (blue)</li>
-    </ul>
-    <div class="legend"><span class="swatch" style="background:#cc3333"></span> θ1 — Base angle</div>
-    <div class="legend"><span class="swatch" style="background:#2266cc"></span> θ2 — Elbow angle</div>
-
-    <h2>Analytic Solution (Law of Cosines)</h2>
-    <p>Let d be the distance from the target to the base. From the law of cosines, solve θ2:</p>
-    <div class="formula">cos θ2 = (d² − L1² − L2²) / (2·L1·L2)</div>
-    <p>Then use the horizontal balance to solve θ1:</p>
-    <div class="formula">θ1 = atan2(y, x) − atan2(L2·sinθ2, L1 + L2·cosθ2)</div>
-
-    <h2>Multiple Solutions & "Elbow Up/Down"</h2>
-    <p>For the same target there are usually <b>two</b> arm configurations: elbow up or elbow down.</p>
-    <p>Checking <b>Elbow Up</b> above switches between the two solutions — a demonstration of IK's <b>multiple-solution</b> nature. Real robots pick the best one based on joint limits or energy use.</p>
-
-    <h2>Reachable Workspace</h2>
-    <p>The end-effector can only reach points within a ring: outer radius R = L1+L2 = 130, inner radius r = |L1−L2| = 30.</p>
-    <ul>
-      <li>Target inside the ring → solvable (green)</li>
-      <li>Target outside the ring → unreachable (red)</li>
-    </ul>
-
-    <h2>How to Interact</h2>
-    <ul>
-      <li><b>Click or drag</b> on the plane to set the target point</li>
-      <li>Press <b>Reset Target</b> to reset</li>
-      <li>Check <b>Elbow Up</b> to switch the solution</li>
-    </ul>
   </div>
 
   <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
