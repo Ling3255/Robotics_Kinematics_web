@@ -41,6 +41,57 @@ function computeFK(state: TwoLinkState) {
 
 type HighlightTarget = "theta1" | "theta2" | "a1" | "a2" | null;
 
+/** A single cell of the 4×4 homogeneous transform matrix. */
+interface MatrixCell {
+  text: string;
+  /** Highlight key(s) — amber highlight while a matching slider/input is active. */
+  hl?: HighlightTarget | HighlightTarget[];
+  /** Semantic color: purple = rotation, blue = position, gray = fixed row. */
+  color?: "purple" | "blue" | "gray";
+}
+
+const CELL_COLOR = {
+  purple: "text-purple-700",
+  blue: "text-blue-700",
+  gray: "text-slate-400",
+} as const;
+
+/** Compact 4×4 matrix renderer, styled like the Transformation page. */
+function Matrix4({
+  rows,
+  isHL,
+}: {
+  rows: MatrixCell[][];
+  isHL: (t: Exclude<HighlightTarget, null>) => boolean;
+}) {
+  return (
+    <div className="inline-block align-middle font-mono text-[11px] leading-tight overflow-x-auto max-w-full">
+      {rows.map((row, r) => (
+        <div key={r} className="flex items-stretch gap-0.5">
+          <span className="w-1 bg-slate-300 rounded-l-sm shrink-0" />
+          {row.map((c, i) => {
+            const active = c.hl
+              ? Array.isArray(c.hl)
+                ? c.hl.some(isHL)
+                : isHL(c.hl)
+              : false;
+            return (
+              <span
+                key={i}
+                className={`min-w-[46px] px-1 py-[1px] text-center whitespace-nowrap tabular-nums
+                  ${active ? "bg-amber-100 text-amber-700 font-bold rounded" : c.color ? CELL_COLOR[c.color] : "text-slate-700"}`}
+              >
+                {c.text}
+              </span>
+            );
+          })}
+          <span className="w-1 bg-slate-300 rounded-r-sm shrink-0" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function TwoLink2DArm() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
@@ -49,6 +100,7 @@ export default function TwoLink2DArm() {
   const [highlight, setHighlight] = useState<HighlightTarget>(null);
   const [trail, setTrail] = useState<{ x: number; y: number }[]>([]);
   const [showTrail, setShowTrail] = useState(true);
+  const [showMatrix, setShowMatrix] = useState(true);
   
   const trailRef = useRef(trail);
   useEffect(() => { trailRef.current = trail; }, [trail]);
@@ -472,9 +524,15 @@ export default function TwoLink2DArm() {
         <div className="w-[300px] shrink-0 flex flex-col gap-4 min-h-0 overflow-y-auto">
           {/* ----- Formula Panel ----- */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 shrink-0">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
               📐 Forward Kinematics Formula
             </p>
+            <p className="text-[10px] text-slate-400 mb-3 leading-snug">
+              FK maps joint angles (θ₁, θ₂) → end-effector pose (position + orientation)
+            </p>
+
+            {/* ① Position（位置） */}
+            <p className="text-[10px] font-semibold text-slate-500 mb-1.5">① Position（位置）</p>
             
             {/* Formula 1: x */}
             <div className="mb-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
@@ -531,6 +589,154 @@ export default function TwoLink2DArm() {
                 <span className="text-slate-600">)</span>
               </div>
             </div>
+
+            {/* ② Orientation（姿态） */}
+            <p className="text-[10px] font-semibold text-slate-500 mt-3 mb-1.5">② Orientation（姿态）</p>
+            <div className="mb-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+              <div className="flex items-baseline gap-1 flex-wrap font-mono text-sm leading-relaxed">
+                <span className="text-slate-600">φ</span>
+                <span className="text-slate-400">=</span>
+                <span className={`font-bold px-0.5 rounded transition-colors ${isHL("theta1") ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300" : "text-blue-600"}`}>
+                  θ₁
+                </span>
+                <span className="text-slate-400">+</span>
+                <span className={`font-bold px-0.5 rounded transition-colors ${isHL("theta2") ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300" : "text-emerald-600"}`}>
+                  θ₂
+                </span>
+                <span className="text-slate-400">=</span>
+                <span className="font-bold text-purple-600 tabular-nums">
+                  {(state.theta1 + state.theta2).toFixed(1)}°
+                </span>
+              </div>
+              <p className="text-[9px] text-slate-400 mt-1 leading-snug">
+                End-effector orientation angle — the sum of all joint angles
+              </p>
+            </div>
+
+            {/* ③ Matrix Form（变换矩阵） */}
+            <div className="flex items-center justify-between mt-1 mb-1.5">
+              <p className="text-[10px] font-semibold text-slate-500">③ Matrix Form（变换矩阵）</p>
+              <button
+                onClick={() => setShowMatrix(!showMatrix)}
+                className="text-[10px] font-medium text-blue-600 hover:text-blue-700 cursor-pointer"
+              >
+                {showMatrix ? "Hide ▴" : "Show ▾"}
+              </button>
+            </div>
+
+            {showMatrix && (
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                <p className="font-mono text-[11px] text-slate-700 mb-2 text-center">
+                  <sup>0</sup><sub>2</sub>T = <sup>0</sup><sub>1</sub>T · <sup>1</sup><sub>2</sub>T
+                </p>
+
+                <p className="text-[9px] text-slate-400 text-center mb-0.5">Joint 1 transform <sup>0</sup><sub>1</sub>T(θ₁) =</p>
+                <div className="flex justify-center mb-2">
+                  <Matrix4
+                    isHL={isHL}
+                    rows={[
+                      [
+                        { text: "cos θ₁", hl: "theta1", color: "purple" },
+                        { text: "−sin θ₁", hl: "theta1", color: "purple" },
+                        { text: "0", color: "gray" },
+                        { text: "a₁cos θ₁", hl: ["a1", "theta1"], color: "blue" },
+                      ],
+                      [
+                        { text: "sin θ₁", hl: "theta1", color: "purple" },
+                        { text: "cos θ₁", hl: "theta1", color: "purple" },
+                        { text: "0", color: "gray" },
+                        { text: "a₁sin θ₁", hl: ["a1", "theta1"], color: "blue" },
+                      ],
+                      [
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "1", color: "gray" },
+                        { text: "0", color: "gray" },
+                      ],
+                      [
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "1", color: "gray" },
+                      ],
+                    ]}
+                  />
+                </div>
+
+                <p className="text-[9px] text-slate-400 text-center mb-0.5">Joint 2 transform <sup>1</sup><sub>2</sub>T(θ₂) =</p>
+                <div className="flex justify-center mb-2">
+                  <Matrix4
+                    isHL={isHL}
+                    rows={[
+                      [
+                        { text: "cos θ₂", hl: "theta2", color: "purple" },
+                        { text: "−sin θ₂", hl: "theta2", color: "purple" },
+                        { text: "0", color: "gray" },
+                        { text: "a₂cos θ₂", hl: ["a2", "theta2"], color: "blue" },
+                      ],
+                      [
+                        { text: "sin θ₂", hl: "theta2", color: "purple" },
+                        { text: "cos θ₂", hl: "theta2", color: "purple" },
+                        { text: "0", color: "gray" },
+                        { text: "a₂sin θ₂", hl: ["a2", "theta2"], color: "blue" },
+                      ],
+                      [
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "1", color: "gray" },
+                        { text: "0", color: "gray" },
+                      ],
+                      [
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "1", color: "gray" },
+                      ],
+                    ]}
+                  />
+                </div>
+
+                <p className="text-[9px] text-slate-400 text-center mb-0.5">
+                  Multiply them together: <sup>0</sup><sub>2</sub>T = <sup>0</sup><sub>1</sub>T · <sup>1</sup><sub>2</sub>T
+                </p>
+                <div className="flex justify-center mb-2">
+                  <Matrix4
+                    isHL={isHL}
+                    rows={[
+                      [
+                        { text: "cos φ", hl: ["theta1", "theta2"], color: "purple" },
+                        { text: "−sin φ", hl: ["theta1", "theta2"], color: "purple" },
+                        { text: "0", color: "gray" },
+                        { text: "x", color: "blue" },
+                      ],
+                      [
+                        { text: "sin φ", hl: ["theta1", "theta2"], color: "purple" },
+                        { text: "cos φ", hl: ["theta1", "theta2"], color: "purple" },
+                        { text: "0", color: "gray" },
+                        { text: "y", color: "blue" },
+                      ],
+                      [
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "1", color: "gray" },
+                        { text: "0", color: "gray" },
+                      ],
+                      [
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "0", color: "gray" },
+                        { text: "1", color: "gray" },
+                      ],
+                    ]}
+                  />
+                </div>
+
+                <p className="text-[9px] text-slate-400 leading-snug">
+                  where <span className="font-mono font-semibold text-slate-600">φ = θ₁ + θ₂</span>. The last column gives the
+                  end-effector position (x, y); the top-left 2×2 block gives the orientation R(φ).
+                </p>
+              </div>
+            )}
           </div>
 
           {/* ----- End Effector Position ----- */}
