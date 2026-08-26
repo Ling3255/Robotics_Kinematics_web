@@ -269,7 +269,7 @@ function SyncCube({ orientationRef }: { orientationRef: OrientationRef }) {
   return (
     <mesh ref={cubeRef}>
       <boxGeometry args={[1.2, 1.2, 1.2]} />
-      <meshStandardMaterial color="#38bdf8" roughness={0.42} metalness={0.08} />
+      <meshStandardMaterial color="#38bdf8" roughness={0.42} metalness={0.08} transparent opacity={0.35} />
     </mesh>
   );
 }

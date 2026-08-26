@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import * as THREE from "three";
 import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Html, MeshTransmissionMaterial, OrbitControls, useProgress } from "@react-three/drei";
-import { IDENTITY_MATRIX_3X3, mat3FromQuaternion, quatMultiply, quatNormalize } from "./types";
+import { IDENTITY_MATRIX_3X3, mat3FromQuaternion } from "./types";
 
 const AXIS_LENGTH = 2.4;
 const SPHERE_RADIUS = 1.2;
@@ -18,6 +18,12 @@ interface SingleAxisRotatorProps {
 }
 
 type AxisLock = "X" | "Y" | "Z";
+
+const WORLD_AXES: Record<AxisLock, [number, number, number]> = {
+  X: [1, 0, 0],
+  Y: [0, 0, -1],
+  Z: [0, 1, 0],
+};
 
 function LoadingOverlay() {
   const { active, progress } = useProgress();
@@ -137,28 +143,32 @@ function DragRotateSphere({
 
       const rect = gl.domElement.getBoundingClientRect();
       const radius = Math.min(rect.width, rect.height) * 0.5;
-      let angleX = (dy / radius) * 1.8;
-      let angleY = (dx / radius) * 1.8;
-
-      // Apply axis lock
-      if (axisLock === "X") { angleY = 0; }
-      if (axisLock === "Y") { angleX = 0; }
-      if (axisLock === "Z") { angleY = 0; }
 
       const cameraRight = camera.getWorldDirection(new THREE.Vector3())
         .cross(camera.up)
         .normalize();
       const cameraUp = camera.up.clone().normalize();
 
-      const qX = new THREE.Quaternion().setFromAxisAngle(cameraRight, angleX);
-      const qY = new THREE.Quaternion().setFromAxisAngle(cameraUp, angleY);
+      // Rotate about the locked world axis. Project the axis into screen space and
+      // use the drag component perpendicular to it as the signed rotation angle.
+      // This keeps the X, Y and Z locks distinct (previously X and Z were identical).
+      const worldAxis = new THREE.Vector3(...WORLD_AXES[axisLock]);
+      const axisScreenX = worldAxis.dot(cameraRight);
+      const axisScreenY = worldAxis.dot(cameraUp);
+      let perpX = -axisScreenY;
+      let perpY = axisScreenX;
+      const perpLen = Math.hypot(perpX, perpY);
+      if (perpLen > 1e-6) {
+        perpX /= perpLen;
+        perpY /= perpLen;
+      } else {
+        // Axis points straight out of the screen: fall back to horizontal drag.
+        perpX = 1;
+        perpY = 0;
+      }
 
-      const combined = quatMultiply(
-        { x: qX.x, y: qX.y, z: qX.z, w: qX.w },
-        { x: qY.x, y: qY.y, z: qY.z, w: qY.w },
-      );
-      const normalized = quatNormalize(combined);
-      const deltaQ = new THREE.Quaternion(normalized.x, normalized.y, normalized.z, normalized.w);
+      const lockAngle = ((dx * perpX + dy * perpY) / radius) * 1.8;
+      const deltaQ = new THREE.Quaternion().setFromAxisAngle(worldAxis.normalize(), lockAngle);
 
       const newQuat = deltaQ.multiply(dragRef.current.prevQuat).normalize();
       dragRef.current.prevQuat = newQuat.clone();
@@ -204,6 +214,8 @@ function DragRotateSphere({
           iridescenceIOR={0.6}
           iridescenceThicknessRange={[0, 1100]}
           color="#a78bfa"
+          transparent
+          opacity={0.35}
         />
       </mesh>
       {/* Colored dots on sphere surface to show orientation */}
@@ -219,6 +231,10 @@ function DragRotateSphere({
         <sphereGeometry args={[0.09, 16, 16]} />
         <meshStandardMaterial color="#2563eb" emissive="#2563eb" emissiveIntensity={0.5} />
       </mesh>
+      {/* Internal B-frame axes (rotate with the sphere) */}
+      <arrowHelper args={[new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1.0, "#ef4444", 0.12, 0.07]} />
+      <arrowHelper args={[new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 0), 1.0, "#111827", 0.12, 0.07]} />
+      <arrowHelper args={[new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1.0, "#2563eb", 0.12, 0.07]} />
     </group>
   );
 }

@@ -100,6 +100,7 @@ function UReferenceFrame() {
 function UBAngleIndicator({ orientationRef }: { orientationRef: { current: THREE.Quaternion } }) {
   const arcLineRef = useRef<THREE.Line | null>(null);
   const labelRef = useRef<HTMLDivElement | null>(null);
+  const angleTextRef = useRef<HTMLSpanElement | null>(null);
   const angleDegRef = useRef(0);
   const arcRadius = 0.7;
   const numSegments = 64;
@@ -125,6 +126,7 @@ function UBAngleIndicator({ orientationRef }: { orientationRef: { current: THREE
     const angleRad = Math.acos(Math.min(1, Math.max(-1, xB.dot(xU))));
     const angleDeg = THREE.MathUtils.radToDeg(angleRad);
     angleDegRef.current = angleDeg;
+    if (angleTextRef.current) angleTextRef.current.textContent = angleDeg.toFixed(0);
 
     if (angleRad < 0.005) {
       if (arcLineRef.current) arcLineRef.current.visible = false;
@@ -169,7 +171,7 @@ function UBAngleIndicator({ orientationRef }: { orientationRef: { current: THREE
           className="rounded-full bg-orange-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-md backdrop-blur transition-opacity"
           style={{ opacity: 0 }}
         >
-          ∠ {angleDegRef.current.toFixed(0)}°
+          ∠ <span ref={angleTextRef}>0</span>°
         </div>
       </Html>
     </group>
@@ -341,6 +343,8 @@ function RotationSphere({
           iridescenceIOR={0.6}
           iridescenceThicknessRange={[0, 1100]}
           color="#a78bfa"
+          transparent
+          opacity={0.35}
         />
       </mesh>
       {/* Colored dots on sphere surface to show orientation */}

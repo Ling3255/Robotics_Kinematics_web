@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useBottomPanelStore } from "@/store/useBottomPanelStore";
 import RotationSphereScene from "./components/RotationSphereScene";
 import RotationMatrixPanel from "./components/RotationMatrixPanel";
+import OrientationMatrixNotation from "./components/OrientationMatrixNotation";
 import PositionChangeQuiz from "./components/PositionChangeQuiz";
 import PositionVsOrientationDemo from "./components/PositionVsOrientationDemo";
 import SingleAxisRotator from "./components/SingleAxisRotator";
@@ -170,6 +171,7 @@ export default function OrientationLesson() {
         />
         <div className="flex min-h-0 flex-col gap-4 overflow-auto">
           <RotationMatrixPanel matrixRef={matrixRef} isActive={true} />
+          <OrientationMatrixNotation />
           <Feedback variant="info" title="U vs B Frames">
             The <strong>U frame</strong> (X_U, Y_U, Z_U) is the fixed world coordinate system — it never moves.
             The <strong>B frame</strong> (X_B, Y_B, Z_B) is attached to the sphere and rotates with it.
