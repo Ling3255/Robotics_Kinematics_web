@@ -2,9 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Html, MeshTransmissionMaterial, OrbitControls, useProgress } from "@react-three/drei";
-import { IDENTITY_MATRIX_3X3, mat3FromQuaternion } from "./types";
+import { IDENTITY_MATRIX_3X3, mat3FromQuaternion, quatMultiply, quatNormalize } from "./types";
 
 const AXIS_LENGTH = 2.4;
 const SPHERE_RADIUS = 1.2;
@@ -17,7 +17,7 @@ interface SingleAxisRotatorProps {
   onMatrixChange: (matrix: RotationMatrix9) => void;
 }
 
-type AxisLock = "X" | "Y" | "Z" | "free";
+type AxisLock = "X" | "Y" | "Z";
 
 function LoadingOverlay() {
   const { active, progress } = useProgress();
@@ -89,54 +89,106 @@ function FixedAxes() {
   );
 }
 
-function SingleAxisSphere({
+function DragRotateSphere({
   axisLock,
-  angle,
   matrixRef,
   onMatrixChange,
 }: {
   axisLock: AxisLock;
-  angle: number;
   matrixRef: { current: RotationMatrix9 };
   onMatrixChange: (matrix: RotationMatrix9) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const angleRef = useRef(angle);
+  const { camera, gl } = useThree();
+  const dragRef = useRef<{
+    active: boolean;
+    lastX: number;
+    lastY: number;
+    prevQuat: THREE.Quaternion;
+  } | null>(null);
 
-  useEffect(() => {
-    angleRef.current = angle;
-  }, [angle]);
+  const onPointerDown = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      event.stopPropagation();
+      (event.target as HTMLElement)?.setPointerCapture?.(event.pointerId);
+      if (groupRef.current) {
+        dragRef.current = {
+          active: true,
+          lastX: event.nativeEvent.clientX,
+          lastY: event.nativeEvent.clientY,
+          prevQuat: groupRef.current.quaternion.clone(),
+        };
+      }
+    },
+    [],
+  );
 
-  useEffect(() => {
-    if (!groupRef.current) return;
+  const onPointerMove = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      if (!dragRef.current?.active) return;
+      event.stopPropagation();
 
-    const rad = THREE.MathUtils.degToRad(angle);
-    let q: THREE.Quaternion;
+      const dx = event.nativeEvent.clientX - dragRef.current.lastX;
+      const dy = event.nativeEvent.clientY - dragRef.current.lastY;
+      dragRef.current.lastX = event.nativeEvent.clientX;
+      dragRef.current.lastY = event.nativeEvent.clientY;
 
-    switch (axisLock) {
-      case "X":
-        q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), rad);
-        break;
-      case "Y":
-        // Y is black (0, 0, -1) in world
-        q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), rad);
-        break;
-      case "Z":
-        q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rad);
-        break;
-      default:
-        q = new THREE.Quaternion().identity();
-    }
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
 
-    groupRef.current.quaternion.copy(q);
+      const rect = gl.domElement.getBoundingClientRect();
+      const radius = Math.min(rect.width, rect.height) * 0.5;
+      let angleX = (dy / radius) * 1.8;
+      let angleY = (dx / radius) * 1.8;
 
-    const matrix = mat3FromQuaternion({ x: q.x, y: q.y, z: q.z, w: q.w });
-    matrixRef.current = matrix;
-    onMatrixChange(matrix);
-  }, [angle, axisLock, matrixRef, onMatrixChange]);
+      // Apply axis lock
+      if (axisLock === "X") { angleY = 0; }
+      if (axisLock === "Y") { angleX = 0; }
+      if (axisLock === "Z") { angleY = 0; }
+
+      const cameraRight = camera.getWorldDirection(new THREE.Vector3())
+        .cross(camera.up)
+        .normalize();
+      const cameraUp = camera.up.clone().normalize();
+
+      const qX = new THREE.Quaternion().setFromAxisAngle(cameraRight, angleX);
+      const qY = new THREE.Quaternion().setFromAxisAngle(cameraUp, angleY);
+
+      const combined = quatMultiply(
+        { x: qX.x, y: qX.y, z: qX.z, w: qX.w },
+        { x: qY.x, y: qY.y, z: qY.z, w: qY.w },
+      );
+      const normalized = quatNormalize(combined);
+      const deltaQ = new THREE.Quaternion(normalized.x, normalized.y, normalized.z, normalized.w);
+
+      const newQuat = deltaQ.multiply(dragRef.current.prevQuat).normalize();
+      dragRef.current.prevQuat = newQuat.clone();
+
+      if (groupRef.current) {
+        groupRef.current.quaternion.copy(newQuat);
+      }
+
+      const matrix = mat3FromQuaternion({ x: newQuat.x, y: newQuat.y, z: newQuat.z, w: newQuat.w });
+      matrixRef.current = matrix;
+      onMatrixChange(matrix);
+    },
+    [camera, gl.domElement, matrixRef, onMatrixChange, axisLock],
+  );
+
+  const onPointerUp = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      dragRef.current = null;
+      (event.target as HTMLElement)?.releasePointerCapture?.(event.pointerId);
+    },
+    [],
+  );
 
   return (
-    <group ref={groupRef}>
+    <group
+      ref={groupRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
       <mesh>
         <sphereGeometry args={[SPHERE_RADIUS, 64, 64]} />
         <MeshTransmissionMaterial
@@ -173,12 +225,10 @@ function SingleAxisSphere({
 
 function SceneContent({
   axisLock,
-  angle,
   matrixRef,
   onMatrixChange,
 }: {
   axisLock: AxisLock;
-  angle: number;
   matrixRef: { current: RotationMatrix9 };
   onMatrixChange: (matrix: RotationMatrix9) => void;
 }) {
@@ -192,9 +242,8 @@ function SceneContent({
         <meshStandardMaterial color="#111827" />
       </mesh>
       <Label position={[0.14, 0.14, -0.1]}>O</Label>
-      <SingleAxisSphere
+      <DragRotateSphere
         axisLock={axisLock}
-        angle={angle}
         matrixRef={matrixRef}
         onMatrixChange={onMatrixChange}
       />
@@ -206,10 +255,8 @@ function SceneContent({
 
 export default function SingleAxisRotator({ resetKey, matrixRef, onMatrixChange }: SingleAxisRotatorProps) {
   const [axisLock, setAxisLock] = useState<AxisLock>("X");
-  const [angle, setAngle] = useState(0);
 
   useEffect(() => {
-    setAngle(0);
     matrixRef.current = [...IDENTITY_MATRIX_3X3];
     onMatrixChange([...IDENTITY_MATRIX_3X3]);
   }, [resetKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -218,11 +265,10 @@ export default function SingleAxisRotator({ resetKey, matrixRef, onMatrixChange 
     X: "bg-red-500",
     Y: "bg-slate-800",
     Z: "bg-blue-500",
-    free: "bg-purple-400",
   };
 
   return (
-    <div className="relative flex h-full min-h-[420px] flex-col gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
+    <div className="relative flex h-full min-h-[420px] flex-col gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm">
       {/* 3D Canvas */}
       <div className="relative flex-1 min-h-0">
         <Canvas camera={{ position: [4.2, 3.6, 5.8], fov: 42 }} gl={{ antialias: true }}>
@@ -230,25 +276,32 @@ export default function SingleAxisRotator({ resetKey, matrixRef, onMatrixChange 
           <Suspense fallback={null}>
             <SceneContent
               axisLock={axisLock}
-              angle={angle}
               matrixRef={matrixRef}
               onMatrixChange={onMatrixChange}
             />
           </Suspense>
         </Canvas>
         <LoadingOverlay />
+        {/* Info overlay */}
+        <div className="absolute left-4 top-4 z-10 rounded-xl bg-white/90 px-3 py-2 text-xs font-semibold leading-5 text-slate-600 shadow-sm backdrop-blur">
+          <p>Drag the sphere to rotate. Right-drag to orbit camera. Scroll to zoom.</p>
+        </div>
+        {/* Hint */}
+        <div className="absolute bottom-4 left-4 z-10 rounded-lg border border-amber-200 bg-amber-50/95 px-3 py-2 text-[11px] leading-relaxed text-amber-800 shadow-sm backdrop-blur">
+          <span className="font-bold">💡 Tip:</span>{" "}
+          Lock an axis to rotate only on the other two. Observe how the rotation matrix columns change.
+        </div>
       </div>
 
-      {/* Controls overlay */}
-      <div className="shrink-0 border-t border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
-        {/* Axis selection pills */}
-        <div className="mb-3 flex items-center gap-2">
+      {/* Axis lock controls */}
+      <div className="shrink-0 border-t border-slate-200 bg-white/90 px-4 py-2.5 backdrop-blur">
+        <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Lock Axis:</span>
           {(["X", "Y", "Z"] as const).map((axis) => (
             <button
               key={axis}
               type="button"
-              onClick={() => { setAxisLock(axis); setAngle(0); }}
+              onClick={() => setAxisLock(axis)}
               className={`rounded-full px-3 py-1 text-xs font-bold transition ${
                 axisLock === axis
                   ? `${axisColors[axis]} text-white`
@@ -258,22 +311,6 @@ export default function SingleAxisRotator({ resetKey, matrixRef, onMatrixChange 
               {axis}-Axis
             </button>
           ))}
-        </div>
-
-        {/* Angle slider */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-slate-500">Angle:</span>
-          <input
-            type="range"
-            min={-180}
-            max={180}
-            value={angle}
-            onChange={(e) => setAngle(Number(e.target.value))}
-            className="h-2 flex-1 cursor-pointer appearance-none rounded-full bg-slate-200 accent-slate-700"
-          />
-          <span className="w-14 text-right font-mono text-sm font-bold tabular-nums text-slate-800">
-            {angle}°
-          </span>
         </div>
       </div>
     </div>

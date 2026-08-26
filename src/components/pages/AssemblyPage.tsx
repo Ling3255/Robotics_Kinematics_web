@@ -309,7 +309,7 @@ function LabelMatchPhase({ onComplete }: { onComplete: () => void }) {
 // ============================================================
 // PHASE 3: Quiz — fill-in-the-blank for part counts
 // ============================================================
-function QuizPhase({ onComplete }: { onComplete: () => void }) {
+function QuizPhase({ onComplete, snapshot }: { onComplete: () => void; snapshot: string | null }) {
   const [answers, setAnswers] = useState({ base: "", joints: "", links: "", endEffector: "" });
   const [result, setResult] = useState<"correct" | "wrong" | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
@@ -346,6 +346,20 @@ function QuizPhase({ onComplete }: { onComplete: () => void }) {
         <p className="text-sm text-slate-500 mb-8 leading-relaxed">
           How many of each part type did you assemble? Fill in the numbers.
         </p>
+
+        {/* Snapshot of the arm you just assembled */}
+        {snapshot && (
+          <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+            <img
+              src={snapshot}
+              alt="The robot arm you just assembled"
+              className="w-full h-56 object-contain bg-[#f8fafc]"
+            />
+            <p className="text-[11px] text-slate-400 py-2 text-center border-t border-slate-200">
+              The robot arm you just assembled — count the parts in the picture
+            </p>
+          </div>
+        )}
 
         {/* Fill-in-the-blank fields */}
         <div className="grid grid-cols-2 gap-4 mb-8">
@@ -458,11 +472,18 @@ export default function Page() {
   const [placed, setPlaced] = useState<Set<string>>(new Set());
   const [hint, setHint] = useState("Drag each label onto the matching part of the robot arm.");
   const [errorHint, setErrorHint] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<string | null>(null);
   const onPlaceRef = useRef<(n: string) => void>(null);
 
   // Phase transition callbacks
   const goToAssembly = useCallback(() => { setPhase("assembly"); setHint("Now drag each part image onto the table to assemble the arm."); }, []);
-  const goToQuiz = useCallback(() => setPhase("quiz"), []);
+  // Snapshot the assembled 3D arm right before leaving the assembly phase,
+  // so the quiz can show it as a memory aid.
+  const goToQuiz = useCallback(() => {
+    const c = document.getElementById("cvs")?.querySelector("canvas");
+    if (c) setSnapshot((c as HTMLCanvasElement).toDataURL("image/png"));
+    setPhase("quiz");
+  }, []);
   const goToSummary = useCallback(() => setPhase("summary"), []);
 
   // Assembly onPlace handler with better hints
@@ -581,7 +602,7 @@ export default function Page() {
         </div>
         {/* Right: 3D canvas */}
         <div id="cvs" className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
-          <Canvas camera={{ position: [0, 7, -9], fov: 50, near: 0.5, far: 200 }} gl={{ antialias: true }} style={{ background: "#f8fafc" }}>
+          <Canvas camera={{ position: [0, 7, -9], fov: 50, near: 0.5, far: 200 }} gl={{ antialias: true, preserveDrawingBuffer: true }} style={{ background: "#f8fafc" }}>
             <Scene placed={placed} onPlace={onPlaceRef} phase="assembly" />
           </Canvas>
           {/* Error hint toast */}
@@ -606,7 +627,7 @@ export default function Page() {
       </div>
     )}
 
-    {phase === "quiz" && <QuizPhase onComplete={goToSummary} />}
+    {phase === "quiz" && <QuizPhase onComplete={goToSummary} snapshot={snapshot} />}
 
     {phase === "summary" && <SummaryPhase />}
 
