@@ -105,6 +105,18 @@ function UBAngleIndicator({ orientationRef }: { orientationRef: { current: THREE
   const numSegments = 64;
   const arcGeomRef = useRef<THREE.BufferGeometry>(new THREE.BufferGeometry());
   const positionArrayRef = useRef(new Float32Array((numSegments + 1) * 3));
+  const arcLine = useMemo(
+    () =>
+      new THREE.Line(
+        arcGeomRef.current,
+        new THREE.LineBasicMaterial({
+          color: "#f97316",
+          transparent: true,
+          opacity: 0.8,
+        })
+      ),
+    []
+  );
 
   useFrame(() => {
     const xB = new THREE.Vector3(1, 0, 0).applyQuaternion(orientationRef.current).normalize();
@@ -145,10 +157,12 @@ function UBAngleIndicator({ orientationRef }: { orientationRef: { current: THREE
 
   return (
     <group>
-      <line ref={arcLineRef}>
-        <bufferGeometry />
-        <lineBasicMaterial color="#f97316" linewidth={2} transparent opacity={0.8} />
-      </line>
+      <primitive
+        object={arcLine}
+        ref={(l: THREE.Line) => {
+          arcLineRef.current = l;
+        }}
+      />
       <Html position={[0, 0, 0]} center distanceFactor={6} occlude={false} style={{ pointerEvents: "none" }}>
         <div
           ref={labelRef}

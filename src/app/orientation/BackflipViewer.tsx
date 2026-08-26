@@ -140,6 +140,18 @@ function UBAngleIndicator({ orientationRef }: { orientationRef: OrientationRef }
   // Create the arc geometry once
   const arcGeomRef = useRef<THREE.BufferGeometry>(new THREE.BufferGeometry());
   const positionArrayRef = useRef(new Float32Array((numSegments + 1) * 3));
+  const arcLine = useMemo(
+    () =>
+      new THREE.Line(
+        arcGeomRef.current,
+        new THREE.LineBasicMaterial({
+          color: "#f97316",
+          transparent: true,
+          opacity: 0.85,
+        })
+      ),
+    []
+  );
 
   useFrame(() => {
     // Compute X_B direction from orientation
@@ -199,10 +211,12 @@ function UBAngleIndicator({ orientationRef }: { orientationRef: OrientationRef }
 
   return (
     <group>
-      <line ref={arcRef}>
-        <bufferGeometry />
-        <lineBasicMaterial color="#f97316" linewidth={2} transparent opacity={0.85} />
-      </line>
+      <primitive
+        object={arcLine}
+        ref={(l: THREE.Line) => {
+          arcRef.current = l;
+        }}
+      />
       {/* Arcs at tip positions for better visibility */}
       <Html position={[0, 0, 0]} center distanceFactor={6} occlude={false} style={{ pointerEvents: "none" }}>
         <div
