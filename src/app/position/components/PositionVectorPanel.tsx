@@ -65,9 +65,18 @@ export default function PositionVectorPanel({ qPosition, completed, onPreset }: 
             <dd>The movable object (the ball), initially at U and moved to a new position.</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="shrink-0 font-bold text-slate-700">q<sub>x</sub> q<sub>y</sub> q<sub>z</sub></dt>
-            <dd>Distances from U to Q measured along the X (red), Y (black) and Z (blue) axes.</dd>
+            <dt className="shrink-0 font-bold text-red-600">Qx</dt>
+            <dd>Distance from U to Q measured along the X (red) axis.</dd>
           </div>
+          <div className="flex gap-2">
+            <dt className="shrink-0 font-bold text-slate-700">Qy</dt>
+            <dd>Distance from U to Q measured along the Y (black) axis.</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="shrink-0 font-bold text-blue-600">Qz</dt>
+            <dd>Distance from U to Q measured along the Z (blue) axis.</dd>
+          </div>
+
         </dl>
       </div>
 

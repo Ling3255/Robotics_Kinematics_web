@@ -4,7 +4,9 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import HintBox from "@/components/ui/HintBox";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Html, Line, OrbitControls, useProgress } from "@react-three/drei";
+import { Html, Line, OrbitControls, useGLTF, useProgress, useTexture } from "@react-three/drei";
+
+
 import {
   INITIAL_Q_POSITION,
   TARGET_Q_POSITION,
@@ -66,6 +68,24 @@ function AxisArrow({ direction, color }: { direction: [number, number, number]; 
 function Room({ showAxes, highlightAxes }: { showAxes: boolean; highlightAxes: boolean }) {
   const floorCenter: [number, number, number] = [U_WORLD[0] + ROOM_WIDTH / 2, U_WORLD[1] - 0.02, U_WORLD[2] - ROOM_DEPTH / 2];
 
+  // Load the rough white wall texture and configure seamless tiling.
+  // The two walls have different aspect ratios, so each gets its own repeat
+  // (proportional to its face aspect ratio) to keep the tiles square/natural.
+  const wallTexture = useTexture("/images/white_rough_2.png");
+  const wallTexture2 = useMemo(() => {
+    const t = wallTexture.clone();
+    t.needsUpdate = true;
+    return t;
+  }, [wallTexture]);
+
+  wallTexture.wrapS = THREE.RepeatWrapping;
+  wallTexture.wrapT = THREE.RepeatWrapping;
+  wallTexture.repeat.set(ROOM_DEPTH / ROOM_HEIGHT, 1);
+
+  wallTexture2.wrapS = THREE.RepeatWrapping;
+  wallTexture2.wrapT = THREE.RepeatWrapping;
+  wallTexture2.repeat.set(ROOM_WIDTH / ROOM_HEIGHT, 1);
+
   return (
     <group>
       <mesh position={floorCenter} receiveShadow>
@@ -75,13 +95,15 @@ function Room({ showAxes, highlightAxes }: { showAxes: boolean; highlightAxes: b
       <gridHelper args={[ROOM_WIDTH, 12, "#94a3b8", "#e2e8f0"]} position={floorCenter} />
       <mesh position={[U_WORLD[0] - 0.02, ROOM_HEIGHT / 2, U_WORLD[2] - ROOM_DEPTH / 2]} receiveShadow>
         <boxGeometry args={[0.04, ROOM_HEIGHT, ROOM_DEPTH]} />
-        <meshStandardMaterial color="#9ca3af" roughness={0.82} transparent opacity={0.88} />
+        <meshStandardMaterial map={wallTexture} bumpMap={wallTexture} bumpScale={0.05} color="#FFFFFF" roughness={1.0} metalness={0} transparent opacity={0.88} />
       </mesh>
 
       <mesh position={[U_WORLD[0] + ROOM_WIDTH / 2, ROOM_HEIGHT / 2, U_WORLD[2] + 0.02]} receiveShadow>
         <boxGeometry args={[ROOM_WIDTH, ROOM_HEIGHT, 0.04]} />
-        <meshStandardMaterial color="#9ca3af" roughness={0.82} transparent opacity={0.88} />
+        <meshStandardMaterial map={wallTexture2} bumpMap={wallTexture2} bumpScale={0.05} color="#FFFFFF" roughness={1.0} metalness={0} transparent opacity={0.88} />
       </mesh>
+
+
 
       <mesh position={U_WORLD}>
         <sphereGeometry args={[0.055, 24, 24]} />
@@ -104,18 +126,26 @@ function Room({ showAxes, highlightAxes }: { showAxes: boolean; highlightAxes: b
   );
 }
 
+// Basketball model replaces the original gray reference sphere.
+// The GLB is ~0.239 units in diameter and centered at the origin; the original
+// gray ball had a radius of 0.17 (diameter 0.34), so we scale it proportionally
+// to match that size. Default pose is kept (no rotation).
+const BASKETBALL_SCALE = 0.34 / 0.239;
+
 function BallModel({ selected }: { selected: boolean }) {
+  const { scene } = useGLTF("/models/basketball.glb");
   return (
-    <mesh castShadow receiveShadow>
-      <sphereGeometry args={[0.17, 32, 32]} />
-      <meshStandardMaterial
-        color={selected ? "#9ca3af" : "#d1d5db"}
-        roughness={0.55}
-        metalness={0.08}
-      />
-    </mesh>
+    <primitive
+      object={scene}
+      scale={BASKETBALL_SCALE}
+      castShadow
+      receiveShadow
+    />
   );
 }
+
+useGLTF.preload("/models/basketball.glb");
+
 
 function StaticQ({ position = INITIAL_Q_POSITION }: { position?: Vec3Position }) {
   return (

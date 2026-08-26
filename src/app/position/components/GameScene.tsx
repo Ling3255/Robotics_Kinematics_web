@@ -537,6 +537,11 @@ function CoordinateOverlay({
   pulse: boolean;
 }) {
   const textRef = useRef<HTMLSpanElement>(null);
+  // Tracks which movement axes are currently active via keyboard input.
+  // Key mapping: W/S → Y axis, A/D → X axis, Space/Shift → Z axis.
+  // Stored as an array so multiple axes can be shown simultaneously.
+  const [activeAxes, setActiveAxes] = useState<string[]>([]);
+
 
   useEffect(() => {
     let rafId: number;
@@ -553,24 +558,75 @@ function CoordinateOverlay({
     return () => cancelAnimationFrame(rafId);
   }, [posRef]);
 
+  // Listen for movement keys and update the active-axis state.
+  // Key mapping: W/S → Y axis, A/D → X axis, Space/Shift → Z axis.
+  useEffect(() => {
+    const keyToAxis = (code: string): string | null => {
+      if (["KeyW", "KeyS", "ArrowUp", "ArrowDown"].includes(code)) return "Y";
+      if (["KeyA", "KeyD", "ArrowLeft", "ArrowRight"].includes(code)) return "X";
+      if (["Space", "ShiftLeft", "ShiftRight"].includes(code)) return "Z";
+      return null;
+    };
+
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const axis = keyToAxis(e.code);
+      if (!axis) return;
+      setActiveAxes((prev) => (prev.includes(axis) ? prev : [...prev, axis]));
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const axis = keyToAxis(e.code);
+      if (!axis) return;
+      setActiveAxes((prev) => prev.filter((a) => a !== axis));
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
+  const axisColor = (axis: string) =>
+    axis === "X" ? "text-red-600" : axis === "Y" ? "text-slate-700" : "text-blue-600";
+
+
   return (
-    <div className="absolute right-4 top-4 z-10 rounded-lg bg-white/90 px-4 py-3 shadow-lg backdrop-blur">
-      <span
-        ref={textRef}
-        className={`font-mono text-base font-bold tabular-nums transition-all duration-500 ${
-          pulse ? "animate-pulse text-[#00BFFF]" : "text-gray-700"
-        }`}
-        style={{
-          transform: pulse ? "scale(3)" : "scale(1)",
-          transformOrigin: "right top",
-          display: "inline-block",
-        }}
-      >
-        X 0.00  Y 0.00  Z 0.00
-      </span>
+    <div className="absolute right-4 top-4 z-10 flex flex-col items-end gap-2">
+      <div className="rounded-lg bg-white/90 px-4 py-3 shadow-lg backdrop-blur">
+        <span
+          ref={textRef}
+          className={`font-mono text-base font-bold tabular-nums transition-all duration-500 ${
+            pulse ? "animate-pulse text-[#00BFFF]" : "text-gray-700"
+          }`}
+          style={{
+            transform: pulse ? "scale(3)" : "scale(1)",
+            transformOrigin: "right top",
+            display: "inline-block",
+          }}
+        >
+          X 0.00  Y 0.00  Z 0.00
+        </span>
+      </div>
+      {activeAxes.length > 0 && (
+        <div className="rounded-lg bg-white/80 px-4 py-3 shadow-lg backdrop-blur">
+          <span className="text-xl font-bold text-gray-700">
+            Moving along{" "}
+            {activeAxes.map((axis, i) => (
+              <span key={axis}>
+                {i > 0 && <span> and </span>}
+                <span className={axisColor(axis)}>{axis}</span> axis
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
+
     </div>
   );
 }
+
 
 
 // ============================================================
